@@ -18,7 +18,6 @@ setuptools.setup(
         for package in setuptools.find_packages()
         if package.startswith("versionator")
     ],
-    include_package_data=True,
     install_requires=[],
     tests_require=["django"],
     classifiers=[

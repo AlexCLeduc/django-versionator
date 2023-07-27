@@ -2,26 +2,19 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-# from zeus.graphql.dataloader import SingletonDataLoader
+from .dataloaders import BookNameLoader
 from versionator import VersionModel
 
 
 class CustomVersionModel(VersionModel):
     class Meta:
         abstract = True
-        ordering = ["business_date"]
-        get_latest_by = "business_date"
+        ordering = ["timestamp"]
+        get_latest_by = "timestamp"
 
-    business_date = models.DateTimeField(
+    timestamp = models.DateTimeField(
         default=timezone.now,
         verbose_name="hypothetical last edit date",
-    )
-
-    edited_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
     )
 
 
@@ -32,7 +25,7 @@ class CustomVersionModelWithEditor(CustomVersionModel):
     edited_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
-        on_delete=models.SET_DEFAULT,
+        on_delete=models.SET_NULL,
         related_name="+",
     )
 
@@ -41,6 +34,7 @@ class Author(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
 
+        
 
 class AuthorVersion(CustomVersionModel):
     live_model = Author
@@ -53,16 +47,6 @@ class Tag(models.Model):
         return self.name
 
 
-# class BookNameLoader(SingletonDataLoader):
-#     @staticmethod
-#     def batch_load(book_ids):
-#         books_with_authors = Book.objects.filter(id__in=book_ids).select_related("author")
-#         by_id = {b.id: b for b in books_with_authors}
-#         name_for_book = (
-#             lambda b: f"{b.title} ({b.author.first_name} {b.author.last_name})"
-#         )
-#         return [name_for_book(by_id[book_id]) for book_id in book_ids]
-
 
 class Book(models.Model):
 
@@ -71,6 +55,8 @@ class Book(models.Model):
     author = models.ForeignKey(Author, related_name="books", on_delete=models.CASCADE)
     title = models.CharField(max_length=250)
     tags = models.ManyToManyField(Tag)
+
+    changelog_live_name_loader_class = BookNameLoader
 
 
 class BookVersion(CustomVersionModelWithEditor):

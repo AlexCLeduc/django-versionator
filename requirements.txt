@@ -22,3 +22,9 @@ isort===5.7.0
 
 # deployment
 twine==4.0.1
+
+# changelog 
+pleasant-promises==1.1
+graphene==3.1.1     
+graphene-django==3.0.0
+graphql-core-promise==3.2.3.post1   
