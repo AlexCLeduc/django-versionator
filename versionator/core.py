@@ -79,9 +79,9 @@ class HistoryQueryset(QuerySet):
         prev_version_id_subquery = Subquery(
             another_qs.filter(
                 eternal_id=OuterRef("eternal_id"),
-                business_date__lt=OuterRef("business_date"),
+                timestamp__lt=OuterRef("timestamp"),
             )
-            .order_by("-business_date")
+            .order_by("-timestamp")
             .values("id")[:1]
         )
         return self.annotate(previous_version_id=prev_version_id_subquery)
@@ -89,7 +89,7 @@ class HistoryQueryset(QuerySet):
     def with_most_recent_version_id(self):
         most_recent_version_id_subquery = Subquery(
             self.model.objects.filter(eternal_id=OuterRef("eternal_id"))
-            .order_by("-business_date")
+            .order_by("-timestamp")
             .values("pk")[:1]
         )
         return self.annotate(most_recent_version_id=most_recent_version_id_subquery)
@@ -269,7 +269,7 @@ class VersionModel(models.Model, metaclass=VersionModelMeta):
 
     objects = HistoryManager()
 
-    system_date = models.DateTimeField(default=timezone.now)
+    timestamp = models.DateTimeField(default=timezone.now)
 
     @classmethod
     def get_fields_to_version(cls):
@@ -313,7 +313,7 @@ class VersionModel(models.Model, metaclass=VersionModelMeta):
         version = instance.versions.last()
         # update all non-m2m fields
         for f in cls.live_model._meta.fields:
-            if not f.name in ["id", "system_date"]:
+            if not f.name in ["id", "timestamp"]:
                 setattr(version, f.attname, instance.serializable_value(f.name))
 
         version.save()
