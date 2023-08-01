@@ -88,17 +88,17 @@ def test_create_dynamic_model(common):
     assert v1.eternal == live_inst_1
     assert v1.name == "v1"
     assert v1.favorite_group_id == common.group1.id
-    assert v1.groups == []
-
+    assert v1.get_m2m_ids("groups") == []
+    
     live_inst_1.reset_version_attrs()
     live_inst_1.groups.add(common.group1)
     live_inst_1.save()
     assert live_inst_1.versions.count() == 2
     v2 = live_inst_1.versions.last()
-    assert v2.groups == [common.group1.pk]
+    assert v2.get_m2m_ids("groups") == [common.group1.pk]
 
     v1.refresh_from_db()
-    assert v1.groups == []
+    assert v1.get_m2m_ids("groups") == []
 
 
 def test_m2m_add(common):
@@ -109,47 +109,44 @@ def test_m2m_add(common):
 
     # check og version wasn't modified
     assert obj.versions.count() == 2
-    assert obj.versions.first().groups == []
-    assert obj.versions.last().groups == [common.group1.pk]
-
+    assert obj.versions.first().get_m2m_ids("groups") == []
+    assert obj.versions.last().get_m2m_ids("groups") == [common.group1.pk]
 
 def test_m2m_rm(common):
     obj = common.LiveModel.objects.create(name="v1", favorite_group=common.group1)
     obj.groups.add(common.group1)
 
     assert obj.versions.count() == 1
-    assert obj.versions.last().groups == [common.group1.pk]
+    assert obj.versions.last().get_m2m_ids("groups") == [common.group1.pk]
 
     obj.reset_version_attrs()
     obj.groups.remove(common.group1)
 
     # check og version wasn't modified
     assert obj.versions.count() == 2
-    assert obj.versions.first().groups == [common.group1.pk]
-    assert obj.versions.last().groups == []
-
+    assert obj.versions.first().get_m2m_ids("groups") == [common.group1.pk]
+    assert obj.versions.last().get_m2m_ids("groups") == []
 
 def test_m2m_add_and_rm(common):
     obj = common.LiveModel.objects.create(name="v1", favorite_group=common.group1)
     obj.groups.add(common.group1)
 
     assert obj.versions.count() == 1
-    assert obj.versions.last().groups == [common.group1.pk]
+    assert obj.versions.last().get_m2m_ids("groups") == [common.group1.pk]
 
     obj.reset_version_attrs()
     obj.groups.remove(common.group1)
     obj.groups.add(common.group2)
 
     assert obj.versions.count() == 2
-    assert obj.versions.first().groups == [common.group1.pk]
-    assert obj.versions.last().groups == [common.group2.pk]
-
+    assert obj.versions.first().get_m2m_ids("groups") == [common.group1.pk]
+    assert obj.versions.last().get_m2m_ids("groups") == [common.group2.pk]
 
 def test_create_then_m2m_edit_doesnt_add_version(common):
     obj = common.LiveModel.objects.create(name="v1", favorite_group=common.group1)
     obj.groups.add(common.group1)
     assert obj.versions.count() == 1
-    assert obj.versions.last().groups == [common.group1.pk]
+    assert obj.versions.last().get_m2m_ids("groups") == [common.group1.pk]
 
 
 def test_scalar_edit_then_m2m_edit_only_adds_one_version(common):
@@ -162,9 +159,9 @@ def test_scalar_edit_then_m2m_edit_only_adds_one_version(common):
 
     assert obj.versions.count() == 2
     assert obj.versions.first().name == "name1"
-    assert obj.versions.first().groups == []
+    assert obj.versions.first().get_m2m_ids("groups") == []
     assert obj.versions.last().name == "name2"
-    assert obj.versions.last().groups == [common.group1.pk]
+    assert obj.versions.last().get_m2m_ids("groups") == [common.group1.pk]
 
 
 def test_m2m_change_then_scalar_change_only_adds_one_version(common):
@@ -177,9 +174,9 @@ def test_m2m_change_then_scalar_change_only_adds_one_version(common):
 
     assert obj.versions.count() == 2
     assert obj.versions.first().name == "name1"
-    assert obj.versions.first().groups == []
+    assert obj.versions.first().get_m2m_ids("groups") == []
     assert obj.versions.last().name == "name2"
-    assert obj.versions.last().groups == [common.group1.pk]
+    assert obj.versions.last().get_m2m_ids("groups") == [common.group1.pk]
 
 
 def test_create_via_model_form(common):
@@ -203,4 +200,4 @@ def test_create_via_model_form(common):
     assert obj.versions.count() == 1
     v1 = obj.versions.last()
     assert v1.name == "v1"
-    assert v1.groups == [common.group1.pk]
+    assert v1.get_m2m_ids("groups") == [common.group1.pk]

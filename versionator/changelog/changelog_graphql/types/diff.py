@@ -1,6 +1,6 @@
 import inspect
 
-from django.db.models import ForeignKey, JSONField, ManyToManyField
+from django.db.models import ForeignKey, ManyToManyField
 from django.utils.functional import cached_property
 from django.utils.html import escape
 
@@ -8,6 +8,7 @@ import graphene
 
 from promise import Promise
 
+from versionator.core import M2MTextField
 from versionator.changelog.diff_utils import list_diff, text_compare_inline
 from versionator.changelog.graphql.dataloader import PrimaryKeyDataLoaderFactory
 from versionator.changelog.graphql.utils import NonSerializable, genfunc_to_prom, non_serializable_field
@@ -125,9 +126,8 @@ class AsyncDiffObject(DiffObject):
 class M2MDiffObject(AsyncDiffObject):
     @genfunc_to_prom
     def _compute_diffs(self):
-        prev_id_list = self.previous_version.serializable_value(self.field.name)
-        current_id_list = self.current_version.serializable_value(self.field.name)
-
+        prev_id_list = self.previous_version.get_m2m_ids(self.field.name)
+        current_id_list = self.current_version.get_m2m_ids(self.field.name)
         related_model = self.field.related_model
         related_dataloader_cls = PrimaryKeyDataLoaderFactory.get_model_by_id_loader(
             related_model
@@ -186,7 +186,7 @@ def is_field_different_accross_versions(current_version, previous_version, field
     prev_db_value = previous_version.serializable_value(field_name)
 
     field_obj = current_version._meta.get_field(field_name)
-    if isinstance(field_obj, JSONField):
+    if isinstance(field_obj, M2MTextField):
         return current_db_value != prev_db_value
 
     if current_db_value == prev_db_value or (

@@ -5,7 +5,7 @@ Faker==4.0.0
 graphene==3.1.1     
 graphene-django==3.0.0
 graphql-core-promise==3.2.3.post1   
-ipython==7.2.0
+ipython==8.10.0
 psycopg2-binary==2.9.5
 python-dateutil==2.7.3
 
@@ -19,6 +19,7 @@ pytest==7.1.2
 pytest-django==4.5.2
 factory-boy===2.12.0
 isort===5.7.0
+
 
 # deployment
 twine==4.0.1
