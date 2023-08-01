@@ -1,3 +1,4 @@
+import json
 from django.db import models
 from django.db.models import F, Manager, OuterRef, QuerySet, Subquery
 from django.db.models.base import ModelBase
@@ -12,6 +13,12 @@ class VersioningException(Exception):
 
 
 class VersioningConfigException(VersioningException):
+    pass
+
+class M2MTextField(models.TextField):
+    """
+        A 'nominal' type is used for convenience of distinguishing from plain text fields
+    """
     pass
 
 
@@ -110,6 +117,9 @@ class HistoryManager(Manager):
 
 
 def m2m_default_empty_list():
+    """
+        here for legacy reasons, referred to from older migrations
+    """
     return []
 
 
@@ -238,7 +248,7 @@ class VersionModelMeta(ModelBase):
     def _create_m2m_fields(version_cls, live_model):
         m2m_fields_to_add = {}
         for field in version_cls.get_m2m_fields_to_version():
-            new_field = models.JSONField(default=m2m_default_empty_list)
+            new_field = models.TextField(default="[]")
             m2m_fields_to_add[field.name] = new_field
 
         return m2m_fields_to_add
@@ -320,10 +330,10 @@ class VersionModel(models.Model, metaclass=VersionModelMeta):
 
     @staticmethod
     def serialize_m2m_ids(pk_list):
-        return sorted(pk_list)
+        return json.dumps(sorted(pk_list))
 
     def get_m2m_ids(self, key):
-        getattr(self, key)
+        return json.loads(getattr(self, key) or [])
 
     def set_m2m(self, field, pk_set):
         setattr(self, field.name, self.serialize_m2m_ids(pk_set))
