@@ -141,7 +141,7 @@ class M2MDiffObject(AsyncDiffObject):
             ]
         )
 
-        get_name = lambda inst: inst.name
+        get_name = lambda inst: inst.__str__()
         before_list = sorted([*prev_instances], key=get_name)
         after_list = sorted([*current_instances], key=get_name)
 
@@ -237,7 +237,7 @@ def m2m_display_value(version, field_obj, dataloader_cache):
     related_dataloader = related_dataloader_cls(dataloader_cache)
     related_instances = yield related_dataloader.load_many(id_list)
 
-    sorted_names = sorted([inst.name for inst in related_instances])
+    sorted_names = sorted([inst.__str__() for inst in related_instances])
     return "".join([f"<p>{name}</p>" for name in sorted_names])
 
 
