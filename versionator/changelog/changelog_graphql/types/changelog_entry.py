@@ -1,7 +1,6 @@
-from django.db.models import ForeignKey, ManyToManyField
 
 import graphene
-from graphene import DateTime, List, String
+from graphene import List
 
 from versionator.changelog.util import get_diffable_fields_for_model
 from versionator.changelog.graphql.types.version import Version

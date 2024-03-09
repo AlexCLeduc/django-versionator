@@ -1,5 +1,3 @@
-import inspect
-
 from django.db.models import ForeignKey, ManyToManyField
 from django.utils.functional import cached_property
 from django.utils.html import escape
@@ -11,7 +9,7 @@ from promise import Promise
 from versionator.core import M2MTextField
 from versionator.changelog.diff_utils import list_diff, text_compare_inline
 from versionator.changelog.graphql.dataloader import PrimaryKeyDataLoaderFactory
-from versionator.changelog.graphql.utils import NonSerializable, genfunc_to_prom, non_serializable_field
+from versionator.changelog.graphql.utils import NonSerializable, genfunc_to_prom
 
 
 # this is used by the parent resolver and fed to the below graphene type

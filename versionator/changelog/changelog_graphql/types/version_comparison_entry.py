@@ -1,12 +1,10 @@
-from django.db.models import ForeignKey, ManyToManyField
-
 import graphene
-from graphene import DateTime, List, String
+from graphene import List
 
 from versionator.changelog.changelog_graphql.types.version import Version
 from versionator.changelog.util import get_diffable_fields_for_model
 from versionator.changelog.graphql.dataloader import PrimaryKeyDataLoaderFactory
-from versionator.changelog.graphql.utils import NonSerializable, non_serializable_field
+from versionator.changelog.graphql.utils import NonSerializable
 
 from .diff import CreateDiff, DeleteDiff, Diff, get_field_diff_for_version_pair
 
