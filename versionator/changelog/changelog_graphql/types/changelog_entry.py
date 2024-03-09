@@ -1,10 +1,12 @@
-
 import graphene
 from graphene import List
 
-from versionator.changelog.util import get_diffable_fields_for_model
 from versionator.changelog.graphql.types.version import Version
-from versionator.changelog.graphql.utils import NonSerializable, non_serializable_field
+from versionator.changelog.graphql.utils import (
+    NonSerializable,
+    non_serializable_field,
+)
+from versionator.changelog.util import get_diffable_fields_for_model
 
 from .changelog_entry_field_entry import ChangelogEntryFieldEntry
 from .diff import CreateDiff, Diff, get_field_diff_for_version_pair
@@ -53,7 +55,9 @@ class ChangelogEntry(graphene.ObjectType):
         live_obj = parent["eternal"]
 
         if hasattr(live_obj, "changelog_live_name_loader_class"):
-            loader = live_obj.changelog_live_name_loader_class(info.context.dataloaders)
+            loader = live_obj.changelog_live_name_loader_class(
+                info.context.dataloaders
+            )
             return loader.load(live_obj.id)
 
         if hasattr(live_obj, "name"):
@@ -89,7 +93,9 @@ class ChangelogEntry(graphene.ObjectType):
 
         fields_to_diff = get_diffable_fields_for_model(this_version.live_model)
         if specified_fields:
-            fields_to_diff = [f for f in fields_to_diff if f.name in specified_fields]
+            fields_to_diff = [
+                f for f in fields_to_diff if f.name in specified_fields
+            ]
 
         field_diff_objs = []
         for f in fields_to_diff:
@@ -103,7 +109,9 @@ class ChangelogEntry(graphene.ObjectType):
 
     @staticmethod
     def resolve_field_entries(parent, _info):
-        field_objs = get_diffable_fields_for_model(parent["version"].live_model)
+        field_objs = get_diffable_fields_for_model(
+            parent["version"].live_model
+        )
 
         return [
             {

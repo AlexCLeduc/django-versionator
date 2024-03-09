@@ -2,9 +2,11 @@ import graphene
 from graphene import List
 
 from versionator.changelog.changelog_graphql.types.version import Version
-from versionator.changelog.util import get_diffable_fields_for_model
-from versionator.changelog.graphql.dataloader import PrimaryKeyDataLoaderFactory
+from versionator.changelog.graphql.dataloader import (
+    PrimaryKeyDataLoaderFactory,
+)
 from versionator.changelog.graphql.utils import NonSerializable
+from versionator.changelog.util import get_diffable_fields_for_model
 
 from .diff import CreateDiff, DeleteDiff, Diff, get_field_diff_for_version_pair
 
@@ -66,7 +68,9 @@ class VersionComparisonEntry(graphene.ObjectType):
         live_model = history_model.live_model
         fields_to_diff = get_diffable_fields_for_model(live_model)
 
-        LoaderCls = PrimaryKeyDataLoaderFactory.get_model_by_id_loader(history_model)
+        LoaderCls = PrimaryKeyDataLoaderFactory.get_model_by_id_loader(
+            history_model
+        )
         loader_inst = LoaderCls(info.context.dataloaders)
         left_ver = yield loader_inst.load(parent["left_id"])
         right_ver = yield loader_inst.load(parent["right_id"])

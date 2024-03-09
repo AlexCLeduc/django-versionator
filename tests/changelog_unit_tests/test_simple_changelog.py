@@ -25,7 +25,9 @@ def test_simple_changelog():
 
     assert edit_entries[0]["version"]["instance"] == book1_v2
     assert len(edit_entries[0]["diffs"]) == 2
-    diffs_by_fields = {diff["field_name"]: diff for diff in edit_entries[0]["diffs"]}
+    diffs_by_fields = {
+        diff["field_name"]: diff for diff in edit_entries[0]["diffs"]
+    }
 
     # field-diffs might come in any order
     assert set(diffs_by_fields.keys()) == {

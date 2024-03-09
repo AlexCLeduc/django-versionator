@@ -1,4 +1,5 @@
 import json
+
 from django.db import models
 from django.db.models import F, Manager, OuterRef, QuerySet, Subquery
 from django.db.models.base import ModelBase
@@ -15,10 +16,12 @@ class VersioningException(Exception):
 class VersioningConfigException(VersioningException):
     pass
 
+
 class M2MTextField(models.TextField):
     """
-        A 'nominal' type is used for convenience of distinguishing from plain text fields
+    A 'nominal' type is used for convenience of distinguishing from plain text fields
     """
+
     pass
 
 
@@ -26,7 +29,8 @@ def find_m2m_field(from_class, to_class):
     return next(
         rel
         for rel in from_class._meta.get_fields()
-        if isinstance(rel, models.ManyToManyField) and rel.related_model is to_class
+        if isinstance(rel, models.ManyToManyField)
+        and rel.related_model is to_class
     )
 
 
@@ -99,10 +103,14 @@ class HistoryQueryset(QuerySet):
             .order_by("-timestamp")
             .values("pk")[:1]
         )
-        return self.annotate(most_recent_version_id=most_recent_version_id_subquery)
+        return self.annotate(
+            most_recent_version_id=most_recent_version_id_subquery
+        )
 
     def only_most_recent_versions(self):
-        return self.with_most_recent_version_id().filter(id=F("most_recent_version_id"))
+        return self.with_most_recent_version_id().filter(
+            id=F("most_recent_version_id")
+        )
 
 
 class HistoryManager(Manager):
@@ -118,7 +126,7 @@ class HistoryManager(Manager):
 
 def m2m_default_empty_list():
     """
-        here for legacy reasons, referred to from older migrations
+    here for legacy reasons, referred to from older migrations
     """
     return []
 
@@ -198,7 +206,9 @@ class VersionModelMeta(ModelBase):
         if getattr(options, "abstract", False):
             return super().__new__(cls, cls_name, bases, cls_attrs, **kwargs)
         else:
-            return cls._create_version_class(cls, cls_name, bases, cls_attrs, **kwargs)
+            return cls._create_version_class(
+                cls, cls_name, bases, cls_attrs, **kwargs
+            )
 
     @staticmethod
     def _create_version_class(cls, cls_name, bases, cls_attrs, **kwargs):
@@ -215,7 +225,9 @@ class VersionModelMeta(ModelBase):
                 "cannot define 2 history classes for a single model"
             )
 
-        version_cls = super().__new__(cls, cls_name, bases, cls_attrs, **kwargs)
+        version_cls = super().__new__(
+            cls, cls_name, bases, cls_attrs, **kwargs
+        )
 
         versioned_fields = cls._get_versioned_fields(live_model, version_cls)
         for name, field_obj in versioned_fields.items():
@@ -302,7 +314,10 @@ class VersionModel(models.Model, metaclass=VersionModelMeta):
         instance_dict.update(
             {
                 f.attname: cls.serialize_m2m_ids(
-                    [related.id for related in getattr(live_instance, f.name).all()]
+                    [
+                        related.id
+                        for related in getattr(live_instance, f.name).all()
+                    ]
                 )
                 for f in cls.m2m_fields
             }
@@ -324,7 +339,9 @@ class VersionModel(models.Model, metaclass=VersionModelMeta):
         # update all non-m2m fields
         for f in cls.live_model._meta.fields:
             if not f.name in ["id", "timestamp"]:
-                setattr(version, f.attname, instance.serializable_value(f.name))
+                setattr(
+                    version, f.attname, instance.serializable_value(f.name)
+                )
 
         version.save()
 
@@ -340,15 +357,21 @@ class VersionModel(models.Model, metaclass=VersionModelMeta):
         self.save()
 
     def recreate_original(self):
-        live_fields = [f for f in self.live_model._meta.fields if f.name != "id"]
-        record_attrs = {f.attname: getattr(self, f.attname) for f in live_fields}
+        live_fields = [
+            f for f in self.live_model._meta.fields if f.name != "id"
+        ]
+        record_attrs = {
+            f.attname: getattr(self, f.attname) for f in live_fields
+        }
 
         obj = self.live_model(**record_attrs)
         obj.id = obj.pk = self.eternal_id
 
         # defensively remove this temporary object's save method
         def new_save():
-            raise VersioningException("can't save live-obj recreated from a version")
+            raise VersioningException(
+                "can't save live-obj recreated from a version"
+            )
 
         setattr(obj, "save", new_save)
 

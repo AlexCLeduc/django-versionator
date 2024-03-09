@@ -11,4 +11,5 @@ def group_by_iteritems(iterable, key=lambda x: x):
 def group_by(iterable, key):
     return dict(group_by_iteritems(iterable, key))
 
+
 flatten = lambda l: [item for sublist in l for item in sublist]

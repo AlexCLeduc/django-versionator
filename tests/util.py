@@ -42,7 +42,9 @@ class QueryCounter:
 
     def __init__(self):
         self.query_collector = QueryCollector()
-        self.connection_ctx_manager = connection.execute_wrapper(self.query_collector)
+        self.connection_ctx_manager = connection.execute_wrapper(
+            self.query_collector
+        )
 
     def __enter__(self):
         self.connection_ctx_manager.__enter__()

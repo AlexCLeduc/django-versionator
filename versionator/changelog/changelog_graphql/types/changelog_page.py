@@ -17,7 +17,9 @@ class ChangelogPage(graphene.ObjectType):
         return [
             {
                 **data_record,
-                "fields": fields_by_model.get(data_record["eternal"].__class__, None),
+                "fields": fields_by_model.get(
+                    data_record["eternal"].__class__, None
+                ),
             }
             for data_record in fetcher.get_fully_fetched_edit_entries()
         ]

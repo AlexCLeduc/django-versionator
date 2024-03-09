@@ -1,7 +1,10 @@
 import graphene
 
 from versionator.changelog.graphql.types.version import Version
-from versionator.changelog.graphql.utils import NonSerializable, non_serializable_field
+from versionator.changelog.graphql.utils import (
+    NonSerializable,
+    non_serializable_field,
+)
 
 
 class HasNonSerializableRecordMixin(graphene.ObjectType):

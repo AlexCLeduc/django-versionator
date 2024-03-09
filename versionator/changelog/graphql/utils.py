@@ -4,7 +4,6 @@ import inspect
 from django.db.models import Model
 
 import graphene
-
 from promise import is_thenable
 
 
@@ -39,7 +38,9 @@ def non_serializable_field(func):
 
         if info.context.requires_serializable:
             if is_thenable(ret):
-                return ret.then(lambda val: _stringify_internal_python_value(val))
+                return ret.then(
+                    lambda val: _stringify_internal_python_value(val)
+                )
 
             return _stringify_internal_python_value(ret)
 

@@ -1,13 +1,17 @@
 import graphene
 
-from versionator.changelog.consecutive_versions_fetcher import ConsecutiveVersionsFetcher
 from versionator.changelog.changelog_graphql.util import (
     convert_enum_list_to_dict,
     create_model_enum_type,
     create_model_field_enum_type,
     create_standard_changelog_graphql_mixin,
 )
-from versionator.changelog.graphql.internal_query_executor_base import InternalQueryExecutorBase
+from versionator.changelog.consecutive_versions_fetcher import (
+    ConsecutiveVersionsFetcher,
+)
+from versionator.changelog.graphql.internal_query_executor_base import (
+    InternalQueryExecutorBase,
+)
 
 base_query = """
     query ChangelogQuery(
@@ -58,7 +62,9 @@ def create_simple_changelog(
     models, page_size=None, fetcher_class=ConsecutiveVersionsFetcher
 ):
     RootQuery = create_standard_changelog_graphql_mixin(
-        diffable_models=models, page_size=page_size, fetcher_class=fetcher_class
+        diffable_models=models,
+        page_size=page_size,
+        fetcher_class=fetcher_class,
     )
     changelog_schema = graphene.Schema(query=RootQuery, auto_camelcase=False)
 

@@ -36,13 +36,17 @@ class AbstractChangelogView(TemplateView):
         page_num = self.kwargs.get("page_num", 1)
         variables = self.get_graphql_variables()
         query_executor = self.query_executor_class()
-        data = query_executor.execute_query(self.graphql_query, variables=variables)
+        data = query_executor.execute_query(
+            self.graphql_query, variables=variables
+        )
 
         edit_entries = data["changelog"]["changelog_entries"]
         has_next_page = data["changelog"]["has_next_page"]
         num_pages = data["changelog"]["num_pages"]
 
-        entries_without_diffs = [entry for entry in edit_entries if not entry["diffs"]]
+        entries_without_diffs = [
+            entry for entry in edit_entries if not entry["diffs"]
+        ]
 
         prev_page = None
         next_page = None

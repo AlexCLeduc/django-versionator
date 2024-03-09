@@ -82,14 +82,16 @@ def common(register_model):
 
 def test_create_dynamic_model(common):
 
-    live_inst_1 = common.LiveModel.objects.create(name="v1", favorite_group=common.group1)
+    live_inst_1 = common.LiveModel.objects.create(
+        name="v1", favorite_group=common.group1
+    )
     assert live_inst_1.versions.count() == 1
     v1 = live_inst_1.versions.last()
     assert v1.eternal == live_inst_1
     assert v1.name == "v1"
     assert v1.favorite_group_id == common.group1.id
     assert v1.get_m2m_ids("groups") == []
-    
+
     live_inst_1.reset_version_attrs()
     live_inst_1.groups.add(common.group1)
     live_inst_1.save()
@@ -102,7 +104,9 @@ def test_create_dynamic_model(common):
 
 
 def test_m2m_add(common):
-    obj = common.LiveModel.objects.create(name="v1", favorite_group=common.group1)
+    obj = common.LiveModel.objects.create(
+        name="v1", favorite_group=common.group1
+    )
     obj.reset_version_attrs()
 
     obj.groups.add(common.group1)
@@ -112,8 +116,11 @@ def test_m2m_add(common):
     assert obj.versions.first().get_m2m_ids("groups") == []
     assert obj.versions.last().get_m2m_ids("groups") == [common.group1.pk]
 
+
 def test_m2m_rm(common):
-    obj = common.LiveModel.objects.create(name="v1", favorite_group=common.group1)
+    obj = common.LiveModel.objects.create(
+        name="v1", favorite_group=common.group1
+    )
     obj.groups.add(common.group1)
 
     assert obj.versions.count() == 1
@@ -127,8 +134,11 @@ def test_m2m_rm(common):
     assert obj.versions.first().get_m2m_ids("groups") == [common.group1.pk]
     assert obj.versions.last().get_m2m_ids("groups") == []
 
+
 def test_m2m_add_and_rm(common):
-    obj = common.LiveModel.objects.create(name="v1", favorite_group=common.group1)
+    obj = common.LiveModel.objects.create(
+        name="v1", favorite_group=common.group1
+    )
     obj.groups.add(common.group1)
 
     assert obj.versions.count() == 1
@@ -142,15 +152,20 @@ def test_m2m_add_and_rm(common):
     assert obj.versions.first().get_m2m_ids("groups") == [common.group1.pk]
     assert obj.versions.last().get_m2m_ids("groups") == [common.group2.pk]
 
+
 def test_create_then_m2m_edit_doesnt_add_version(common):
-    obj = common.LiveModel.objects.create(name="v1", favorite_group=common.group1)
+    obj = common.LiveModel.objects.create(
+        name="v1", favorite_group=common.group1
+    )
     obj.groups.add(common.group1)
     assert obj.versions.count() == 1
     assert obj.versions.last().get_m2m_ids("groups") == [common.group1.pk]
 
 
 def test_scalar_edit_then_m2m_edit_only_adds_one_version(common):
-    obj = common.LiveModel.objects.create(name="name1", favorite_group=common.group1)
+    obj = common.LiveModel.objects.create(
+        name="name1", favorite_group=common.group1
+    )
     obj.reset_version_attrs()
 
     obj.name = "name2"
@@ -165,7 +180,9 @@ def test_scalar_edit_then_m2m_edit_only_adds_one_version(common):
 
 
 def test_m2m_change_then_scalar_change_only_adds_one_version(common):
-    obj = common.LiveModel.objects.create(name="name1", favorite_group=common.group1)
+    obj = common.LiveModel.objects.create(
+        name="name1", favorite_group=common.group1
+    )
     obj.reset_version_attrs()
 
     obj.groups.add(common.group1)

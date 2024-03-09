@@ -3,18 +3,24 @@ from django.utils.functional import cached_property
 from django.utils.html import escape
 
 import graphene
-
 from promise import Promise
 
-from versionator.core import M2MTextField
 from versionator.changelog.diff_utils import list_diff, text_compare_inline
-from versionator.changelog.graphql.dataloader import PrimaryKeyDataLoaderFactory
-from versionator.changelog.graphql.utils import NonSerializable, genfunc_to_prom
+from versionator.changelog.graphql.dataloader import (
+    PrimaryKeyDataLoaderFactory,
+)
+from versionator.changelog.graphql.utils import (
+    NonSerializable,
+    genfunc_to_prom,
+)
+from versionator.core import M2MTextField
 
 
 # this is used by the parent resolver and fed to the below graphene type
 class DiffObject:
-    def __init__(self, current_version, previous_version, field_obj, dataloader_cache):
+    def __init__(
+        self, current_version, previous_version, field_obj, dataloader_cache
+    ):
         self.current_version = current_version
         self.previous_version = previous_version
         self.field = field_obj
@@ -24,8 +30,12 @@ class DiffObject:
 class ScalarDiffObject(DiffObject):
     @cached_property
     def _diffs(self):
-        prev_db_value = self.previous_version.serializable_value(self.field.name)
-        current_db_value = self.current_version.serializable_value(self.field.name)
+        prev_db_value = self.previous_version.serializable_value(
+            self.field.name
+        )
+        current_db_value = self.current_version.serializable_value(
+            self.field.name
+        )
 
         if self.field.choices:
             # if a field is a choice field e.g. chars or ints used to represent a list of choices,
@@ -34,8 +44,12 @@ class ScalarDiffObject(DiffObject):
             choices_by_attr_value = dict(self.field.choices)
             if not choices_by_attr_value.get(None, None):
                 choices_by_attr_value[None] = "empty"
-            previous_value = choices_by_attr_value.get(prev_db_value, prev_db_value)
-            current_value = choices_by_attr_value.get(current_db_value, current_db_value)
+            previous_value = choices_by_attr_value.get(
+                prev_db_value, prev_db_value
+            )
+            current_value = choices_by_attr_value.get(
+                current_db_value, current_db_value
+            )
 
         else:  # just use the normal attribute
             previous_value = prev_db_value
@@ -127,8 +141,8 @@ class M2MDiffObject(AsyncDiffObject):
         prev_id_list = self.previous_version.get_m2m_ids(self.field.name)
         current_id_list = self.current_version.get_m2m_ids(self.field.name)
         related_model = self.field.related_model
-        related_dataloader_cls = PrimaryKeyDataLoaderFactory.get_model_by_id_loader(
-            related_model
+        related_dataloader_cls = (
+            PrimaryKeyDataLoaderFactory.get_model_by_id_loader(related_model)
         )
         related_dataloader = related_dataloader_cls(self.dataloader_cache)
 
@@ -151,12 +165,16 @@ class M2MDiffObject(AsyncDiffObject):
 class ForeignKeyDiffObject(AsyncDiffObject):
     @genfunc_to_prom
     def _compute_diffs(self):
-        prev_db_value = self.previous_version.serializable_value(self.field.name)
-        current_db_value = self.current_version.serializable_value(self.field.name)
+        prev_db_value = self.previous_version.serializable_value(
+            self.field.name
+        )
+        current_db_value = self.current_version.serializable_value(
+            self.field.name
+        )
 
         related_model = self.field.remote_field.model
-        related_dataloader_cls = PrimaryKeyDataLoaderFactory.get_model_by_id_loader(
-            related_model
+        related_dataloader_cls = (
+            PrimaryKeyDataLoaderFactory.get_model_by_id_loader(related_model)
         )
         dataloader = related_dataloader_cls(self.dataloader_cache)
 
@@ -179,7 +197,9 @@ class ForeignKeyDiffObject(AsyncDiffObject):
         return joint, before, after
 
 
-def is_field_different_accross_versions(current_version, previous_version, field_name):
+def is_field_different_accross_versions(
+    current_version, previous_version, field_name
+):
     current_db_value = current_version.serializable_value(field_name)
     prev_db_value = previous_version.serializable_value(field_name)
 
@@ -210,7 +230,9 @@ def get_field_diff_for_version_pair(
     else:
         DiffClass = ScalarDiffObject
 
-    diff_obj = DiffClass(current_version, previous_version, field_obj, dataloaders)
+    diff_obj = DiffClass(
+        current_version, previous_version, field_obj, dataloaders
+    )
     return diff_obj
 
 
@@ -229,8 +251,8 @@ def m2m_display_value(version, field_obj, dataloader_cache):
     if not id_list:
         return "empty"
     related_model = field_obj.related_model
-    related_dataloader_cls = PrimaryKeyDataLoaderFactory.get_model_by_id_loader(
-        related_model
+    related_dataloader_cls = (
+        PrimaryKeyDataLoaderFactory.get_model_by_id_loader(related_model)
     )
     related_dataloader = related_dataloader_cls(dataloader_cache)
     related_instances = yield related_dataloader.load_many(id_list)
@@ -245,8 +267,8 @@ def foreign_key_display_value(version, field_obj, dataloader_cache):
     if related_id is None:
         return "empty"
     related_model = field_obj.related_model
-    related_dataloader_cls = PrimaryKeyDataLoaderFactory.get_model_by_id_loader(
-        related_model
+    related_dataloader_cls = (
+        PrimaryKeyDataLoaderFactory.get_model_by_id_loader(related_model)
     )
     related_dataloader = related_dataloader_cls(dataloader_cache)
 

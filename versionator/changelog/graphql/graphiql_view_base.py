@@ -53,6 +53,10 @@ class GraphiQLViewBase(GraphQLView):
             error_to_log = error
             if hasattr(error, "original_error"):
                 error_to_log = error.original_error
-            traceback_str = "".join(traceback.format_tb(error_to_log.__traceback__))
-            self.logger.error(f"{error_to_log.__class__.__name__}: {error_to_log}")
+            traceback_str = "".join(
+                traceback.format_tb(error_to_log.__traceback__)
+            )
+            self.logger.error(
+                f"{error_to_log.__class__.__name__}: {error_to_log}"
+            )
             self.logger.error(traceback_str)

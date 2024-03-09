@@ -4,7 +4,6 @@ import pytest
 from pytest_django.asserts import assertInHTML
 
 from sample_app.models import Author, Book, Tag
-
 from tests.changelog_unit_tests.example_schema import QueryExecutor
 
 base_query = QueryExecutor().build_query(
@@ -58,7 +57,10 @@ def test_entire_graphql_changelog():
 
     book1_v2 = book1.versions.last()
 
-    with patch("versionator.changelog.changelog_graphql.util.get_changelog_page_size", lambda _: 2):
+    with patch(
+        "versionator.changelog.changelog_graphql.util.get_changelog_page_size",
+        lambda _: 2,
+    ):
         data = base_query(page_num=1)
 
     edit_entries = data["changelog"]["changelog_entries"]
@@ -66,7 +68,9 @@ def test_entire_graphql_changelog():
 
     assert edit_entries[0]["version"]["instance"] == book1_v2
     assert len(edit_entries[0]["diffs"]) == 2
-    diffs_by_fields = {diff["field_name"]: diff for diff in edit_entries[0]["diffs"]}
+    diffs_by_fields = {
+        diff["field_name"]: diff for diff in edit_entries[0]["diffs"]
+    }
 
     # field-diffs might come in any order
     assert set(diffs_by_fields.keys()) == {

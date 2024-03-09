@@ -65,7 +65,10 @@ class ArbitraryVersionPairFetcher:
         right_minus_left = self._index_qs(right_union.difference(left_union))
 
         final_values = []
-        for model, eternal_id in {*left_minus_right.keys(), *right_minus_left.keys()}:
+        for model, eternal_id in {
+            *left_minus_right.keys(),
+            *right_minus_left.keys(),
+        }:
             right_id = right_minus_left.get((model, eternal_id), None)
             left_id = left_minus_right.get((model, eternal_id), None)
             final_values.append(

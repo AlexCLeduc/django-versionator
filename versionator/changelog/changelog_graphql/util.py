@@ -3,8 +3,10 @@ from collections import defaultdict
 import graphene
 from graphene import Boolean, DateTime, Int, List, String
 
-from versionator.changelog.consecutive_versions_fetcher import ConsecutiveVersionsFetcher
 from versionator.changelog.changelog_graphql.types import ChangelogPage
+from versionator.changelog.consecutive_versions_fetcher import (
+    ConsecutiveVersionsFetcher,
+)
 from versionator.changelog.util import get_diffable_fields_for_model
 
 
@@ -24,7 +26,9 @@ def create_model_field_enum_type(models, enum_name="ChangelogModelFields"):
 
             model_field_enum_vals.append(f"{model.__name__}__{field.name}")
 
-    ModelFieldsEnum = graphene.Enum(enum_name, [(v, v) for v in model_field_enum_vals])
+    ModelFieldsEnum = graphene.Enum(
+        enum_name, [(v, v) for v in model_field_enum_vals]
+    )
     return ModelFieldsEnum
 
 
@@ -91,7 +95,9 @@ def create_standard_changelog_graphql_mixin(
             )
 
         if models:
-            model_classes = [m for m in diffable_models if m.__name__ in models]
+            model_classes = [
+                m for m in diffable_models if m.__name__ in models
+            ]
         else:
             model_classes = [*diffable_models]
 
@@ -119,5 +125,3 @@ def create_standard_changelog_graphql_mixin(
         (graphene.ObjectType,),
         {field_name: field, f"resolve_{field_name}": staticmethod(resolver)},
     )
-
-

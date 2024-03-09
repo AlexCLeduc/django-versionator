@@ -3,7 +3,6 @@ import logging
 import traceback
 
 from graphene.test import Client
-
 from graphql.error import GraphQLError
 from graphql.language.parser import parse
 from graphql.validation import validate
@@ -51,14 +50,22 @@ class InternalQueryExecutorBase:
     schema = None
 
     def __init__(self):
-        self.client = Client(self.schema, execution_context_class=PromiseExecutionContext)
+        self.client = Client(
+            self.schema, execution_context_class=PromiseExecutionContext
+        )
         self.dataloaders = {}
 
     def execute_query(
-        self, query: str, root: any = None, context: dict = None, variables: dict = None
+        self,
+        query: str,
+        root: any = None,
+        context: dict = None,
+        variables: dict = None,
     ):
         if context is None:
-            context = GraphQLContext(self.dataloaders, requires_serializable=False)
+            context = GraphQLContext(
+                self.dataloaders, requires_serializable=False
+            )
 
         middleware = [RaiseExceptionsMiddleware(), *get_middleware()]
 

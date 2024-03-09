@@ -94,7 +94,9 @@ class ConsecutiveVersionsFetcher:
                     ).values(f.attname)[:1]
                 )
 
-                qs = qs.annotate(**{get_annotation_name(f): prev_field_value_subquery})
+                qs = qs.annotate(
+                    **{get_annotation_name(f): prev_field_value_subquery}
+                )
 
             # once annotated, we can filter on any OR differences
             # the difference doesn't seem to check for nulls vs. values, so we check that manually
@@ -112,7 +114,9 @@ class ConsecutiveVersionsFetcher:
                 )
                 for field in field_objs
             ]
-            combined_filter = reduce(operator.__or__, field_difference_filters, neverQ)
+            combined_filter = reduce(
+                operator.__or__, field_difference_filters, neverQ
+            )
 
             qs = qs.filter(combined_filter)
 
@@ -176,7 +180,9 @@ class ConsecutiveVersionsFetcher:
         for slim_ver in slim_versions:
             eternal_model = models_by_name[slim_ver["model_name"]]
             hist_model = eternal_model._history_class
-            eternal_ids_to_fetch_by_model[eternal_model].append(slim_ver["eternal_id"])
+            eternal_ids_to_fetch_by_model[eternal_model].append(
+                slim_ver["eternal_id"]
+            )
             version_ids_to_fetch_by_model[hist_model].append(slim_ver["id"])
             if slim_ver.get("previous_version_id", None):
                 version_ids_to_fetch_by_model[hist_model].append(
@@ -204,7 +210,9 @@ class ConsecutiveVersionsFetcher:
                 (eternal_model, slim_ver["eternal_id"])
             ]
 
-            resolved["version"] = version_records_by_pair_id[(hist_model, slim_ver["id"])]
+            resolved["version"] = version_records_by_pair_id[
+                (hist_model, slim_ver["id"])
+            ]
 
             if slim_ver.get("previous_version_id", None):
                 resolved["previous_version"] = version_records_by_pair_id[

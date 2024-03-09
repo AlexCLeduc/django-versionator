@@ -5,9 +5,12 @@ from promise import Promise
 
 from sample_app.data_factories import AuthorFactory, BookFactory, TagFactory
 from sample_app.models import Book, Tag
-from versionator.changelog.graphql.dataloader import PrimaryKeyDataLoaderFactory, SingletonDataLoader
-from versionator.utils import flatten, group_by
 from tests.util import assert_max_queries
+from versionator.changelog.graphql.dataloader import (
+    PrimaryKeyDataLoaderFactory,
+    SingletonDataLoader,
+)
+from versionator.utils import flatten, group_by
 
 
 def test_pk_loader_factory(dataloader_test):
@@ -52,9 +55,9 @@ class TagsForAuthorLoader(SingletonDataLoader):
         book_ids_by_author = group_by(books, lambda b: b.author_id)
         book_ids = [b.id for b in books]
 
-        tag_groups = yield TagsForBookLoader(self.dataloader_instance_cache).load_many(
-            book_ids
-        )
+        tag_groups = yield TagsForBookLoader(
+            self.dataloader_instance_cache
+        ).load_many(book_ids)
         tags_by_book_id = dict(zip(book_ids, tag_groups))
 
         tags_by_author_id = defaultdict(set)

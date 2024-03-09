@@ -1,4 +1,5 @@
 import graphene
+
 from .diff import (
     Diff,
     get_display_value,
@@ -32,7 +33,9 @@ class ChangelogEntryFieldEntry(graphene.ObjectType):
         if parent["previous_version"] is None:
             return None
         return get_display_value(
-            parent["previous_version"], parent["field"], info.context.dataloaders
+            parent["previous_version"],
+            parent["field"],
+            info.context.dataloaders,
         )
 
     @staticmethod

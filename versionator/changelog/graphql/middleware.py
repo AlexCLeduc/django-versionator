@@ -27,9 +27,9 @@ def promised_generator_middleware(next, root, info, **kwargs):
 def conditonal_serialization_middleware(next, root, info, **kwargs):
     next_val = next(root, info, **kwargs)
 
-    is_internal_field = hasattr(info.return_type, "graphene_type") and issubclass(
-        info.return_type.graphene_type, NonSerializable
-    )
+    is_internal_field = hasattr(
+        info.return_type, "graphene_type"
+    ) and issubclass(info.return_type.graphene_type, NonSerializable)
     if not (info.context.requires_serializable and is_internal_field):
         return next_val
 
