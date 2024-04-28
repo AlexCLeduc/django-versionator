@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+            {% block medias %}{% endblock %}
+    {% block extra_scripts_css %}{% endblock %}
+
+    </head>
+    <body>
+
+        <style>
+            .diff_add {
+                color: #155724;
+                background-color: #d4edda;
+                border-color: #c3e6cb;
+            }
+
+            .diff_sub {
+                color: #721c24;
+                background-color: #f8d7da;
+                border-color: #f5c6cb;
+            }
+        </style>
+
+        <table>
+            <thead>
+                <th> Time </th>
+                <th> Author </th>
+                <th> Model Class </th>
+                <th> Object </th>
+                <th> Action </th>
+                <th> Field </th>
+                <th> Current state </th>
+                <th> Previous state </th>
+            </thead>
+            <tbody>
+                {% for entry in page.changelog_entries %}
+                {% for diff in entry.diffs %}
+                <tr>
+                    <td> {{entry.version.timestamp }} </td>
+                    <td> {{entry.edited_by }} </td>
+                    <td> TODO </td>
+                    <td> {{entry.live_name }} </td>
+                    <td> {{diff.action }} </td>
+                    <td> {{diff.field_name }} </td>
+                    {% autoescape off %}
+                    <td> {{diff.diffed_after }} </td>
+                    <td> {{diff.diffed_before }} </td>
+                    {% endautoescape %}
+                </tr>
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </body>
+</html>
