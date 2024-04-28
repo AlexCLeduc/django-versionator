@@ -3,12 +3,11 @@ from django.utils.functional import cached_property
 from django.utils.html import escape
 
 import graphene
+from data_fetcher import PrimaryKeyFetcherFactory
+from data_fetcher.core import LazyFetchedValue
 from promise import Promise
 
 from versionator.changelog.diff_utils import list_diff, text_compare_inline
-from versionator.changelog.graphql.dataloader import (
-    PrimaryKeyDataLoaderFactory,
-)
 from versionator.changelog.graphql.utils import (
     NonSerializable,
     genfunc_to_prom,
@@ -18,16 +17,27 @@ from versionator.core import M2MTextField
 
 # this is used by the parent resolver and fed to the below graphene type
 class DiffObject:
-    def __init__(
-        self, current_version, previous_version, field_obj, dataloader_cache
-    ):
+    def __init__(self, current_version, previous_version, field_obj):
         self.current_version = current_version
         self.previous_version = previous_version
         self.field = field_obj
-        self.dataloader_cache = dataloader_cache
 
 
-class ScalarDiffObject(DiffObject):
+class CachedComputationDiff(DiffObject):
+    def _compute_diffs(self):
+        raise NotImplementedError()
+
+    def get_combined_diff(self):
+        return self._diffs[0]
+
+    def get_before_diff(self):
+        return self._diffs[1]
+
+    def get_after_diff(self):
+        return self._diffs[2]
+
+
+class ScalarDiffObject(CachedComputationDiff):
     @cached_property
     def _diffs(self):
         prev_db_value = self.previous_version.serializable_value(
@@ -61,15 +71,6 @@ class ScalarDiffObject(DiffObject):
         )
 
         return (joint, before, after)
-
-    def get_combined_diff(self):
-        return self._diffs[0]
-
-    def get_before_diff(self):
-        return self._diffs[1]
-
-    def get_after_diff(self):
-        return self._diffs[2]
 
 
 class CreateDiff:
@@ -106,54 +107,15 @@ class DeleteDiff:
         return self._get_deleted_str()
 
 
-class AsyncDiffObject(DiffObject):
-    def _compute_diffs(self):
-        raise NotImplementedError()
+class M2MDiffObject(CachedComputationDiff):
+    @cached_property
+    def _diffs(self):
+        prev_instances = self.previous_instances().get()
+        current_instances = self.current_instances().get()
 
-    @genfunc_to_prom
-    def _get_diffs(self):
-        if hasattr(self, "_diff_result"):
-            return self._diff_result
+        def get_name(inst):
+            return inst.__str__()
 
-        diffs = yield self._compute_diffs()
-        self._diff_result = diffs
-        return diffs
-
-    @genfunc_to_prom
-    def get_combined_diff(self):
-        diffs = yield self._get_diffs()
-        return diffs[0]
-
-    @genfunc_to_prom
-    def get_before_diff(self):
-        diffs = yield self._get_diffs()
-        return diffs[1]
-
-    @genfunc_to_prom
-    def get_after_diff(self):
-        diffs = yield self._get_diffs()
-        return diffs[2]
-
-
-class M2MDiffObject(AsyncDiffObject):
-    @genfunc_to_prom
-    def _compute_diffs(self):
-        prev_id_list = self.previous_version.get_m2m_ids(self.field.name)
-        current_id_list = self.current_version.get_m2m_ids(self.field.name)
-        related_model = self.field.related_model
-        related_dataloader_cls = (
-            PrimaryKeyDataLoaderFactory.get_model_by_id_loader(related_model)
-        )
-        related_dataloader = related_dataloader_cls(self.dataloader_cache)
-
-        prev_instances, current_instances = yield Promise.all(
-            [
-                related_dataloader.load_many(prev_id_list),
-                related_dataloader.load_many(current_id_list),
-            ]
-        )
-
-        get_name = lambda inst: inst.__str__()
         before_list = sorted([*prev_instances], key=get_name)
         after_list = sorted([*current_instances], key=get_name)
 
@@ -161,33 +123,34 @@ class M2MDiffObject(AsyncDiffObject):
 
         return (joint, before, after)
 
-
-class ForeignKeyDiffObject(AsyncDiffObject):
-    @genfunc_to_prom
-    def _compute_diffs(self):
-        prev_db_value = self.previous_version.serializable_value(
-            self.field.name
-        )
-        current_db_value = self.current_version.serializable_value(
-            self.field.name
+    def previous_instances(self):
+        return self.get_lazy_related_records(
+            self.previous_version.get_m2m_ids(self.field.name)
         )
 
-        related_model = self.field.remote_field.model
-        related_dataloader_cls = (
-            PrimaryKeyDataLoaderFactory.get_model_by_id_loader(related_model)
+    def current_instances(self):
+        return self.get_lazy_related_records(
+            self.current_version.get_m2m_ids(self.field.name)
         )
-        dataloader = related_dataloader_cls(self.dataloader_cache)
 
-        if prev_db_value is None:
-            previous_instance = None
-            current_instance = yield dataloader.load(current_db_value)
-        elif current_db_value is None:
-            previous_instance = yield dataloader.load(prev_db_value)
-            current_instance = None
-        else:
-            previous_instance, current_instance = yield dataloader.load_many(
-                [prev_db_value, current_db_value]
-            )
+    def get_lazy_related_records(self, ids):
+        related_model = self.field.related_model
+        related_fetcher = PrimaryKeyFetcherFactory.get_model_by_id_fetcher(
+            related_model
+        ).get_instance()
+        return related_fetcher.get_many_lazy(ids)
+
+    def queue_dependencies(self):
+        self.previous_instances()
+        self.current_instances()
+
+
+class ForeignKeyDiffObject(CachedComputationDiff):
+
+    @cached_property
+    def _diffs(self):
+        previous_instance = self.get_before_record().get()
+        current_instance = self.get_after_record().get()
 
         joint, before, after = text_compare_inline(
             get_str_val(previous_instance),
@@ -196,10 +159,35 @@ class ForeignKeyDiffObject(AsyncDiffObject):
 
         return joint, before, after
 
+    def get_record_lazy(self, id):
+        if not id:
+            return LazyFetchedValue(lambda: None)
+
+        related_model = self.field.remote_field.model
+        related_fetcher_cls = (
+            PrimaryKeyFetcherFactory.get_model_by_id_fetcher(related_model)
+        ).get_instance()
+        return related_fetcher_cls.get_lazy(id)
+
+    def get_before_record(self):
+        return self.get_record_lazy(
+            self.previous_version.serializable_value(self.field.name)
+        )
+
+    def get_after_record(self):
+        return self.get_record_lazy(
+            self.current_version.serializable_value(self.field.name)
+        )
+
+    def queue_dependencies(self):
+        self.get_before_record()
+        self.get_after_record()
+
 
 def is_field_different_accross_versions(
     current_version, previous_version, field_name
 ):
+
     current_db_value = current_version.serializable_value(field_name)
     prev_db_value = previous_version.serializable_value(field_name)
 
@@ -216,7 +204,7 @@ def is_field_different_accross_versions(
 
 
 def get_field_diff_for_version_pair(
-    current_version, previous_version, field_obj, dataloaders
+    current_version, previous_version, field_obj
 ):
     if not is_field_different_accross_versions(
         current_version, previous_version, field_obj.name
@@ -230,9 +218,7 @@ def get_field_diff_for_version_pair(
     else:
         DiffClass = ScalarDiffObject
 
-    diff_obj = DiffClass(
-        current_version, previous_version, field_obj, dataloaders
-    )
+    diff_obj = DiffClass(current_version, previous_version, field_obj)
     return diff_obj
 
 
@@ -246,42 +232,42 @@ def get_str_val(fetched_field_value):
 
 
 @genfunc_to_prom
-def m2m_display_value(version, field_obj, dataloader_cache):
+def m2m_display_value(version, field_obj):
     id_list = version.get_m2m_ids(field_obj.name)
     if not id_list:
         return "empty"
     related_model = field_obj.related_model
-    related_dataloader_cls = (
-        PrimaryKeyDataLoaderFactory.get_model_by_id_loader(related_model)
+    related_fetcher_cls = PrimaryKeyFetcherFactory.get_model_by_id_fetcher(
+        related_model
     )
-    related_dataloader = related_dataloader_cls(dataloader_cache)
-    related_instances = yield related_dataloader.load_many(id_list)
+    related_fetcher = related_fetcher_cls.get_instance()
+    related_instances = related_fetcher.get_many(id_list)
 
     sorted_names = sorted([inst.__str__() for inst in related_instances])
     return "".join([f"<p>{name}</p>" for name in sorted_names])
 
 
 @genfunc_to_prom
-def foreign_key_display_value(version, field_obj, dataloader_cache):
+def foreign_key_display_value(version, field_obj):
     related_id = version.serializable_value(field_obj.name)
     if related_id is None:
         return "empty"
     related_model = field_obj.related_model
-    related_dataloader_cls = (
-        PrimaryKeyDataLoaderFactory.get_model_by_id_loader(related_model)
+    related_fetcher_cls = PrimaryKeyFetcherFactory.get_model_by_id_fetcher(
+        related_model
     )
-    related_dataloader = related_dataloader_cls(dataloader_cache)
+    related_fetcher = related_fetcher_cls.get_instance()
 
-    related_instance = yield related_dataloader.load(related_id)
+    related_instance = related_fetcher.get(related_id)
     return get_str_val(related_instance)
 
 
-def get_display_value(version, field_obj, dataloader_cache):
+def get_display_value(version, field_obj):
     if isinstance(field_obj, ManyToManyField):
-        return m2m_display_value(version, field_obj, dataloader_cache)
+        return m2m_display_value(version, field_obj)
 
     if isinstance(field_obj, ForeignKey):
-        return foreign_key_display_value(version, field_obj, dataloader_cache)
+        return foreign_key_display_value(version, field_obj)
 
     if field_obj.choices:
         db_value = version.serializable_value(field_obj.name)
@@ -293,7 +279,11 @@ def get_display_value(version, field_obj, dataloader_cache):
 
     else:
         # use normal attribute
-        val = getattr(version, field_obj.name)
+        try:
+            val = getattr(version, field_obj.name)
+        except:
+            print(f"\n\n caught error version:{version}, {field_obj.name}\n\n")
+            return "empty"
         if not val:
             return "empty"
         return val

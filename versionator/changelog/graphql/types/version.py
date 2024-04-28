@@ -1,10 +1,8 @@
 from django.contrib.auth import get_user_model
 
 import graphene
+from data_fetcher import PrimaryKeyFetcherFactory
 
-from versionator.changelog.graphql.dataloader import (
-    PrimaryKeyDataLoaderFactory,
-)
 from versionator.changelog.graphql.utils import (
     NonSerializable,
     non_serializable_field,
@@ -26,12 +24,11 @@ class Version(graphene.ObjectType):
         if user_id is None:
             return None
 
-        User = get_user_model()
-        UserDataloader = PrimaryKeyDataLoaderFactory.get_model_by_id_loader(
-            User
-        )
-        user_dataloader = UserDataloader(info.context.dataloaders)
-        return user_dataloader.load(user_id)
+        UserModel = get_user_model()
+        fetcher = PrimaryKeyFetcherFactory.get_model_by_id_fetcher(
+            UserModel
+        ).get_instance()
+        return fetcher.get(user_id)
 
     @staticmethod
     @non_serializable_field

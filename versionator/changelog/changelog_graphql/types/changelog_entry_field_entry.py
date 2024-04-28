@@ -25,7 +25,6 @@ class ChangelogEntryFieldEntry(graphene.ObjectType):
             parent["version"],
             parent["previous_version"],
             parent["field"],
-            info.context.dataloaders,
         )
 
     @staticmethod
@@ -35,14 +34,11 @@ class ChangelogEntryFieldEntry(graphene.ObjectType):
         return get_display_value(
             parent["previous_version"],
             parent["field"],
-            info.context.dataloaders,
         )
 
     @staticmethod
     def resolve_current_display_value(parent, info):
-        return get_display_value(
-            parent["version"], parent["field"], info.context.dataloaders
-        )
+        return get_display_value(parent["version"], parent["field"])
 
     @staticmethod
     def resolve_field(parent, info):

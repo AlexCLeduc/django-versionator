@@ -6,6 +6,13 @@ from django.core.paginator import Paginator
 from django.db.models import CharField, F, OuterRef, Q, Subquery, Value
 from django.utils.functional import cached_property
 
+from data_fetcher import PrimaryKeyFetcherFactory
+
+from versionator.changelog.changelog_graphql.types.diff import (
+    get_field_diff_for_version_pair,
+)
+from versionator.changelog.util import get_diffable_fields_for_model
+
 neverQ = Q(pk=None)
 anyQ = ~neverQ
 
@@ -168,6 +175,11 @@ class ConsecutiveVersionsFetcher:
         return self._page_obj.paginator.num_pages
 
     def get_fully_fetched_edit_entries(self):
+        self.prefetch_entries_and_diff_dependencies()
+        return self._fully_fetched_entries
+
+    @cached_property
+    def _fully_fetched_entries(self):
         """
         our paginated qs only hold id, previous_version_id, eternal_id and model_name in dicts
         """
@@ -224,6 +236,59 @@ class ConsecutiveVersionsFetcher:
             resolved_list.append(resolved)
 
         return resolved_list
+
+    def prefetch_entries_and_diff_dependencies(self):
+        entries = self._fully_fetched_entries
+
+        # fetch live names
+        live_name_fetcher_dependencies = defaultdict(list)
+        for entry in entries:
+            eternal_instance = entry["eternal"]
+            if hasattr(eternal_instance, "changelog_live_name_fetcher_class"):
+                live_name_fetcher_dependencies[
+                    eternal_instance.changelog_live_name_fetcher_class
+                ].append(eternal_instance.id)
+
+        for fetcher_cls, ids in live_name_fetcher_dependencies.items():
+            fetcher = fetcher_cls.get_instance()
+            fetcher.get_many(ids)
+
+        # fetch authors
+        author_ids = set()
+        from django.contrib.auth import get_user_model
+
+        for entry in entries:
+            if getattr(entry["version"], "edited_by_id", None):
+                author_ids.add(entry["version"].edited_by_id)
+
+        user_fetcher = PrimaryKeyFetcherFactory.get_model_by_id_fetcher(
+            get_user_model()
+        ).get_instance()
+        user_fetcher.get_many_lazy(author_ids)
+
+        # fetch diffs
+        # now we fetch diffs, much more challenging, different fetchers are used in different cases
+        # we will need some kind of polymorphism here so that different field-configs
+        # can expose their dependencies
+        for entry in entries:
+            model = entry["eternal"].__class__
+            # TODO: we need to filter the fields being diffed based on arguments
+            # rather than look into GQL query info
+            # this will be fixed later when we change the API
+            prev_version = entry["previous_version"]
+            this_version = entry["version"]
+            if not prev_version:
+                continue
+
+            fields_to_diff = get_diffable_fields_for_model(
+                this_version.live_model
+            )
+            for f in fields_to_diff:
+                diff_obj = get_field_diff_for_version_pair(
+                    this_version, prev_version, f
+                )
+                if diff_obj and hasattr(diff_obj, "queue_dependencies"):
+                    diff_obj.queue_dependencies()
 
 
 class SingleRecordConsecutiveVersionsFetcher(ConsecutiveVersionsFetcher):

@@ -54,11 +54,9 @@ class ChangelogEntry(graphene.ObjectType):
     def resolve_live_name(parent, info):
         live_obj = parent["eternal"]
 
-        if hasattr(live_obj, "changelog_live_name_loader_class"):
-            loader = live_obj.changelog_live_name_loader_class(
-                info.context.dataloaders
-            )
-            return loader.load(live_obj.id)
+        if hasattr(live_obj, "changelog_live_name_fetcher_class"):
+            fetcher = live_obj.changelog_live_name_fetcher_class.get_instance()
+            return fetcher.get(live_obj.id)
 
         if hasattr(live_obj, "name"):
             return live_obj.name
@@ -100,7 +98,7 @@ class ChangelogEntry(graphene.ObjectType):
         field_diff_objs = []
         for f in fields_to_diff:
             field_diff_obj = get_field_diff_for_version_pair(
-                this_version, prev_version, f, info.context.dataloaders
+                this_version, prev_version, f
             )
             if field_diff_obj is not None:
                 field_diff_objs.append(field_diff_obj)

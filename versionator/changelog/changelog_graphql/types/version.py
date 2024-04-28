@@ -1,10 +1,8 @@
 from django.contrib.auth import get_user_model
 
 import graphene
+from data_fetcher import PrimaryKeyFetcherFactory
 
-from versionator.changelog.graphql.dataloader import (
-    PrimaryKeyDataLoaderFactory,
-)
 from versionator.changelog.graphql.utils import (
     NonSerializable,
     non_serializable_field,
@@ -17,12 +15,19 @@ class Version(graphene.ObjectType):
 
     @staticmethod
     def resolve_edited_by(parent, info):
+        try:
+            user_id = parent["instance"].edited_by_id
+        except AttributeError:
+            user_id = None
+
+        if not user_id:
+            return None
+
         UserModel = get_user_model()
-        UserDataloader = PrimaryKeyDataLoaderFactory.get_model_by_id_loader(
+        fetcher = PrimaryKeyFetcherFactory.get_model_by_id_fetcher(
             UserModel
-        )
-        user_dataloader = UserDataloader(info.context.dataloaders)
-        return user_dataloader.load(parent["instance"].edited_by_id)
+        ).get_instance()
+        return fetcher.get(user_id)
 
     @staticmethod
     def resolve_instance(parent, _info):

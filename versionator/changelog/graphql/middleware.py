@@ -41,6 +41,5 @@ def conditonal_serialization_middleware(next, root, info, **kwargs):
 
 def get_middleware():
     return [
-        promised_generator_middleware,
         conditonal_serialization_middleware,
     ]

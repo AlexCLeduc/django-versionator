@@ -2,11 +2,11 @@ import inspect
 import logging
 import traceback
 
+from data_fetcher.global_request_context import GlobalRequest, get_request
 from graphene.test import Client
 from graphql.error import GraphQLError
 from graphql.language.parser import parse
 from graphql.validation import validate
-from graphql_core_promise import PromiseExecutionContext
 
 from .graphql_context import GraphQLContext
 from .middleware import get_middleware
@@ -50,9 +50,7 @@ class InternalQueryExecutorBase:
     schema = None
 
     def __init__(self):
-        self.client = Client(
-            self.schema, execution_context_class=PromiseExecutionContext
-        )
+        self.client = Client(self.schema)
         self.dataloaders = {}
 
     def execute_query(
@@ -67,20 +65,23 @@ class InternalQueryExecutorBase:
                 self.dataloaders, requires_serializable=False
             )
 
-        middleware = [RaiseExceptionsMiddleware(), *get_middleware()]
+        request_context = get_request()
 
-        resp = self.client.execute(
-            query,
-            root,
-            context,
-            variables,
-            middleware=middleware,
-        )
+        with GlobalRequest(request_context):
+            middleware = [RaiseExceptionsMiddleware(), *get_middleware()]
 
-        if "errors" in resp:
-            err = GraphQLExecutionErrorSet(resp["errors"])
-            raise err
-        return resp["data"]
+            resp = self.client.execute(
+                query,
+                root,
+                context,
+                variables,
+                middleware=middleware,
+            )
+
+            if "errors" in resp:
+                err = GraphQLExecutionErrorSet(resp["errors"])
+                raise err
+            return resp["data"]
 
     def build_query(self, query):
         validation_errors = validate(self.schema.graphql_schema, parse(query))
