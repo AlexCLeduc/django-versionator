@@ -17,6 +17,9 @@ from versionator.core import M2MTextField
 
 # this is used by the parent resolver and fed to the below graphene type
 class DiffObject:
+
+    action = "edited"
+
     def __init__(self, current_version, previous_version, field_obj):
         self.current_version = current_version
         self.previous_version = previous_version
@@ -74,6 +77,9 @@ class ScalarDiffObject(CachedComputationDiff):
 
 
 class CreateDiff:
+
+    action = "created"
+
     def __init__(self):
         self.field = None
 
@@ -91,6 +97,9 @@ class CreateDiff:
 
 
 class DeleteDiff:
+
+    action = "deleted"
+
     def __init__(self):
         self.field = None
 

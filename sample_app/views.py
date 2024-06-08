@@ -2,6 +2,7 @@ from django.http.response import HttpResponse
 from django.shortcuts import render
 from django.views import View
 
+from versionator.changelog.new_changelog import Changelog, ChangelogConfig
 from versionator.changelog.simple_changelog import create_simple_changelog
 
 from .models import Book
@@ -22,9 +23,15 @@ def changelog(request):
     For now, this is just a dummy view so we can use the toolbar to see queries
     """
     page_num = int(request.GET.get("page_num", 1))
-    changelog = create_simple_changelog(
+
+    config = ChangelogConfig(
         models=[Book],
         page_size=50,
     )
-    page = changelog.get_page(page_num=page_num)
-    return render(request, "changelog.html", {"page": page})
+
+    # changelog = create_simple_changelog(
+    #     models=[Book],
+    #     page_size=50,
+    # )
+    entries = Changelog(config).get_entries(page_num)
+    return render(request, "changelog.html", {"entries": entries})

@@ -30,11 +30,12 @@
                 <th> Object </th>
                 <th> Action </th>
                 <th> Field </th>
-                <th> Current state </th>
                 <th> Previous state </th>
+                <th> Current state </th>
+                <th> Combined state </th>
             </thead>
             <tbody>
-                {% for entry in page.changelog_entries %}
+                {% for entry in entries %}
                 {% for diff in entry.diffs %}
                 <tr>
                     <td> {{entry.version.timestamp }} </td>
@@ -44,8 +45,9 @@
                     <td> {{diff.action }} </td>
                     <td> {{diff.field_name }} </td>
                     {% autoescape off %}
-                    <td> {{diff.diffed_after }} </td>
-                    <td> {{diff.diffed_before }} </td>
+                    <td> {{diff.get_before_diff }} </td>
+                    <td> {{diff.get_after_diff }} </td>
+                    <td> {{diff.get_combined_diff }} </td>
                     {% endautoescape %}
                 </tr>
                 {% endfor %}

@@ -11,6 +11,7 @@ from data_fetcher import PrimaryKeyFetcherFactory
 from versionator.changelog.changelog_graphql.types.diff import (
     get_field_diff_for_version_pair,
 )
+from versionator.changelog.new_changelog import ChangelogEntry
 from versionator.changelog.util import get_diffable_fields_for_model
 
 neverQ = Q(pk=None)
@@ -32,6 +33,7 @@ class ConsecutiveVersionsFetcher:
         fields_by_model=None,
         start_date=None,
         end_date=None,
+        config=None,
     ):
         if only_creates and (fields_by_model or exclude_create):
             raise Exception(
@@ -48,6 +50,7 @@ class ConsecutiveVersionsFetcher:
         self.only_creates = only_creates
         self.start_date = start_date
         self.end_date = end_date
+        self.config = config
 
     @staticmethod
     def unionize_querysets(qs1, qs2):
@@ -233,7 +236,14 @@ class ConsecutiveVersionsFetcher:
             else:
                 resolved["previous_version"] = None
 
-            resolved_list.append(resolved)
+            resolved_list.append(
+                ChangelogEntry(
+                    left_version=resolved["previous_version"],
+                    right_version=resolved["version"],
+                    eternal=resolved["eternal"],
+                    config=self.config,
+                )
+            )
 
         return resolved_list
 
@@ -243,7 +253,7 @@ class ConsecutiveVersionsFetcher:
         # fetch live names
         live_name_fetcher_dependencies = defaultdict(list)
         for entry in entries:
-            eternal_instance = entry["eternal"]
+            eternal_instance = entry.eternal
             if hasattr(eternal_instance, "changelog_live_name_fetcher_class"):
                 live_name_fetcher_dependencies[
                     eternal_instance.changelog_live_name_fetcher_class
@@ -258,8 +268,8 @@ class ConsecutiveVersionsFetcher:
         from django.contrib.auth import get_user_model
 
         for entry in entries:
-            if getattr(entry["version"], "edited_by_id", None):
-                author_ids.add(entry["version"].edited_by_id)
+            if getattr(entry.right_version, "edited_by_id", None):
+                author_ids.add(entry.right_version.edited_by_id)
 
         user_fetcher = PrimaryKeyFetcherFactory.get_model_by_id_fetcher(
             get_user_model()
@@ -271,12 +281,12 @@ class ConsecutiveVersionsFetcher:
         # we will need some kind of polymorphism here so that different field-configs
         # can expose their dependencies
         for entry in entries:
-            model = entry["eternal"].__class__
+            model = entry.eternal.__class__
             # TODO: we need to filter the fields being diffed based on arguments
             # rather than look into GQL query info
             # this will be fixed later when we change the API
-            prev_version = entry["previous_version"]
-            this_version = entry["version"]
+            prev_version = entry.left_version
+            this_version = entry.right_version
             if not prev_version:
                 continue
 
