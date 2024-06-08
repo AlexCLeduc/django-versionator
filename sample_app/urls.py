@@ -20,12 +20,13 @@ from django.urls import include, path, re_path
 
 import debug_toolbar
 
-from .views import changelog, edit_book
+from .views import ChangelogView, changelog, edit_book
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("login/", LoginView.as_view(), name="login"),
     path("book/<int:pk>/edit/", edit_book, name="edit-book"),
     path("changelog/", changelog, name="changelog"),
+    path("changelog_cls/", ChangelogView.as_view(), name="changelog_cls"),
     re_path(r"^__debug__/", include(debug_toolbar.urls)),
 ]

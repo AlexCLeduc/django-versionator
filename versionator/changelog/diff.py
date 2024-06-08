@@ -2,20 +2,13 @@ from django.db.models import ForeignKey, ManyToManyField
 from django.utils.functional import cached_property
 from django.utils.html import escape
 
-import graphene
 from data_fetcher import PrimaryKeyFetcherFactory
 from data_fetcher.core import LazyFetchedValue
-from promise import Promise
 
 from versionator.changelog.diff_utils import list_diff, text_compare_inline
-from versionator.changelog.graphql.utils import (
-    NonSerializable,
-    genfunc_to_prom,
-)
 from versionator.core import M2MTextField
 
 
-# this is used by the parent resolver and fed to the below graphene type
 class DiffObject:
 
     action = "edited"
@@ -238,102 +231,3 @@ def get_str_val(fetched_field_value):
         return "empty"
     if isinstance(fetched_field_value, object):
         return escape(fetched_field_value.__str__())
-
-
-@genfunc_to_prom
-def m2m_display_value(version, field_obj):
-    id_list = version.get_m2m_ids(field_obj.name)
-    if not id_list:
-        return "empty"
-    related_model = field_obj.related_model
-    related_fetcher_cls = PrimaryKeyFetcherFactory.get_model_by_id_fetcher(
-        related_model
-    )
-    related_fetcher = related_fetcher_cls.get_instance()
-    related_instances = related_fetcher.get_many(id_list)
-
-    sorted_names = sorted([inst.__str__() for inst in related_instances])
-    return "".join([f"<p>{name}</p>" for name in sorted_names])
-
-
-@genfunc_to_prom
-def foreign_key_display_value(version, field_obj):
-    related_id = version.serializable_value(field_obj.name)
-    if related_id is None:
-        return "empty"
-    related_model = field_obj.related_model
-    related_fetcher_cls = PrimaryKeyFetcherFactory.get_model_by_id_fetcher(
-        related_model
-    )
-    related_fetcher = related_fetcher_cls.get_instance()
-
-    related_instance = related_fetcher.get(related_id)
-    return get_str_val(related_instance)
-
-
-def get_display_value(version, field_obj):
-    if isinstance(field_obj, ManyToManyField):
-        return m2m_display_value(version, field_obj)
-
-    if isinstance(field_obj, ForeignKey):
-        return foreign_key_display_value(version, field_obj)
-
-    if field_obj.choices:
-        db_value = version.serializable_value(field_obj.name)
-        choices_by_attr_value = dict(field_obj.choices)
-        if not choices_by_attr_value.get(None, None):
-            choices_by_attr_value[None] = "empty"
-        str_val = choices_by_attr_value.get(db_value, db_value)
-        return get_str_val(str_val)
-
-    else:
-        # use normal attribute
-        try:
-            val = getattr(version, field_obj.name)
-        except:
-            print(f"\n\n caught error version:{version}, {field_obj.name}\n\n")
-            return "empty"
-        if not val:
-            return "empty"
-        return val
-
-
-class Diff(graphene.ObjectType):
-    diffed_before = graphene.String()
-    diffed_after = graphene.String()
-    diffed_combined = graphene.String()
-    action = graphene.String()
-    field_name = graphene.String()
-    field = NonSerializable()
-
-    @staticmethod
-    def resolve_field(parent, _info):
-        return parent.field
-
-    @staticmethod
-    def resolve_field_name(parent, _info):
-        field_obj = parent.field
-        if field_obj is None:
-            return None
-        return field_obj.name
-
-    @staticmethod
-    def resolve_action(parent, _info):
-        if isinstance(parent, CreateDiff):
-            return "created"
-        elif isinstance(parent, DeleteDiff):
-            return "deleted"
-        else:
-            return "edited"
-
-    @staticmethod
-    def resolve_diffed_before(parent, _info):
-        return parent.get_before_diff()
-
-    @staticmethod
-    def resolve_diffed_after(parent, _info):
-        return parent.get_after_diff()
-
-    @staticmethod
-    def resolve_diffed_combined(parent, _info):
-        return parent.get_combined_diff()

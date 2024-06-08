@@ -21,12 +21,7 @@ setuptools.setup(
     install_requires=[],
     # to install these subdeps, use pip install django-versionator[changelog]
     extras_require={
-        "changelog": [
-            "pleasant-promises>=1.1",
-            "graphene>=3.1.1, <4",
-            "graphene-django>=3, <4",
-            "graphql-core-promise>=3.2.3,<4",
-        ],
+        "changelog": ["django-data-fetcher>=2.2, <3"],
     },
     tests_require=["django"],
     classifiers=[

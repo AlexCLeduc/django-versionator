@@ -4,13 +4,10 @@ from typing import List
 from django.db.models import Model
 from django.utils.functional import cached_property
 
-from versionator.changelog.changelog_graphql.types.diff import (
-    CreateDiff,
-    DeleteDiff,
-    get_field_diff_for_version_pair,
-)
 from versionator.changelog.util import get_diffable_fields_for_model
 from versionator.core import VersionModel
+
+from .diff import CreateDiff, DeleteDiff, get_field_diff_for_version_pair
 
 EXCLUDE_CREATES = "exlude_creates"
 INCLUDE_CREATES = "include_creates"

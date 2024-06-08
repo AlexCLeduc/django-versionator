@@ -8,9 +8,7 @@ from django.utils.functional import cached_property
 
 from data_fetcher import PrimaryKeyFetcherFactory
 
-from versionator.changelog.changelog_graphql.types.diff import (
-    get_field_diff_for_version_pair,
-)
+from versionator.changelog.diff import get_field_diff_for_version_pair
 from versionator.changelog.new_changelog import ChangelogEntry
 from versionator.changelog.util import get_diffable_fields_for_model
 

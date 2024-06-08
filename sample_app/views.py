@@ -1,9 +1,8 @@
 from django.http.response import HttpResponse
 from django.shortcuts import render
-from django.views import View
 
 from versionator.changelog.new_changelog import Changelog, ChangelogConfig
-from versionator.changelog.simple_changelog import create_simple_changelog
+from versionator.changelog.views import AbstractChangelogView
 
 from .models import Book
 
@@ -35,3 +34,13 @@ def changelog(request):
     # )
     entries = Changelog(config).get_entries(page_num)
     return render(request, "changelog.html", {"entries": entries})
+
+
+class ChangelogView(AbstractChangelogView):
+    template_name = "changelog.html"
+
+    def get_changelog_config(self):
+        return ChangelogConfig(
+            models=[Book],
+            page_size=50,
+        )
