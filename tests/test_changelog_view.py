@@ -30,8 +30,9 @@ def test_sample_view_with_abstract_class(
         b.save()
 
     url = reverse("changelog_cls")
-    with django_assert_num_queries(108):
-        # number doesn't matter just checking that it's high enough to be sure it's not batched
+    with django_assert_num_queries(104):
+        # number doesn't matter
+        # just checking that it's high enough to be sure it's not batched
         response = client.get(url)
 
     assert len(response.context["entries"]) == 50

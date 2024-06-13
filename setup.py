@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="django-versionator",
-    version="1.1.0",
+    version="2.0.0rc2",
     author="AlexCLeduc",
     # author_email="author@example.com",
     # description="A small example package",

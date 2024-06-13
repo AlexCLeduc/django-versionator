@@ -148,7 +148,6 @@ class M2MDiffObject(CachedComputationDiff):
 
 
 class ForeignKeyDiffObject(CachedComputationDiff):
-
     @cached_property
     def _diffs(self):
         previous_instance = self.get_before_record().get()

@@ -1,5 +1,7 @@
 from unittest.mock import Mock, patch
 
+from django.contrib.auth import get_user_model
+
 import pytest
 from data_fetcher.global_request_context import GlobalRequest
 from pytest_django.asserts import assertInHTML
@@ -35,7 +37,7 @@ def test_simple_case():
     assert len(edit_entries) == 2
 
     assert edit_entries[0].right_version == book1_v2
-    diffs = edit_entries[0].get_diffs()
+    diffs = edit_entries[0].diffs
     assert len(diffs) == 2
     diffs_by_fields = {diff.field.name: diff for diff in diffs}
 
@@ -49,7 +51,7 @@ def test_simple_case():
 
     assert edit_entries[1].right_version == book1_v1
 
-    second_entry_diffs = edit_entries[1].get_diffs()
+    second_entry_diffs = edit_entries[1].diffs
     assert second_entry_diffs[0].action == "created"
 
     assert edit_entries[0].eternal == edit_entries[1].eternal == book1
@@ -57,7 +59,8 @@ def test_simple_case():
     # test that the book's loader is used to load the live name
     assert edit_entries[0].live_name == "jane's diary (jane smith)"
 
-    assert cl.get_num_pages() > 1
+    assert cl.get_page_count() == 2
+    assert cl.get_entry_count() == 4
 
 
 def test_m2m_entries():
@@ -91,7 +94,7 @@ def test_m2m_entries():
     assert len(edit_entries) == 2
 
     latest_entry = edit_entries[0]
-    latest_entry_diffs = latest_entry.get_diffs()
+    latest_entry_diffs = latest_entry.diffs
 
     assert latest_entry.right_version == book_v2
     assert len(latest_entry_diffs) == 1
@@ -150,3 +153,26 @@ def test_num_queries_batched(django_assert_max_num_queries):
             entry.live_name
 
     assert batch_load_spy.call_count == 1
+
+
+def test_authors_are_batched(django_assert_max_num_queries):
+
+    books = BookFactory.create_batch(100)
+    for i, b in enumerate(books):
+        b.reset_version_attrs()
+        b.title = "new title"
+        b.save()
+        last_ver = b.versions.last()
+        last_ver.edited_by = get_user_model().objects.create_user(f"test_{i}")
+        last_ver.save()
+
+    changelog_config = ChangelogConfig(
+        models=[Book],
+        page_size=100,
+    )
+    changelog = Changelog(changelog_config)
+
+    with GlobalRequest(), django_assert_max_num_queries(10):
+        entries = changelog.get_entries(1)
+        for entry in entries:
+            assert entry.author is not None

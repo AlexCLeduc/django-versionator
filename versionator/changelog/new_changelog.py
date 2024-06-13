@@ -1,8 +1,13 @@
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import List
 
+from django.contrib.auth import get_user_model
 from django.db.models import Model
 from django.utils.functional import cached_property
+
+from data_fetcher import PrimaryKeyFetcherFactory
+from data_fetcher.core import LazyFetchedValue
 
 from versionator.changelog.util import get_diffable_fields_for_model
 from versionator.core import VersionModel
@@ -17,15 +22,25 @@ CREATE_MODES = [EXCLUDE_CREATES, INCLUDE_CREATES, ONLY_CREATES]
 
 
 class ChangelogConfig:
+    INCLUDE_CREATES = INCLUDE_CREATES
+    EXCLUDE_CREATES = EXCLUDE_CREATES
+    ONLY_CREATES = ONLY_CREATES
+
     models = None
     page_size = 50
     start_date = None
     end_date = None
-    fetcher_class = None
     create_mode = INCLUDE_CREATES
+    fields_by_model = None
 
     def __init__(
-        self, models=None, start_date=None, end_date=None, page_size=None
+        self,
+        models=None,
+        start_date=None,
+        end_date=None,
+        page_size=None,
+        fields_by_model=None,
+        create_mode=None,
     ):
         if models:
             self.models = models
@@ -35,6 +50,13 @@ class ChangelogConfig:
             self.end_date = end_date
         if page_size:
             self.page_size = page_size
+
+        if fields_by_model:
+            self.fields_by_model = fields_by_model
+
+        if create_mode:
+            assert create_mode in CREATE_MODES
+            self.create_mode = create_mode
 
     def get_models(self) -> List[type]:
         if self.models:
@@ -58,18 +80,72 @@ class ChangelogConfig:
     def get_create_mode(self) -> str:
         return self.create_mode
 
+    def get_base_version_queryset_for_single_model(self, live_model):
+        """
+        Override to filter the version queryset for a single model
+        good for single-record changelogs, filtering by user, etc.
+        """
+        history_model = live_model._history_class
+        return history_model.objects.all()
+
     def get_fetcher_class(self) -> type:
         from versionator.changelog.consecutive_versions_fetcher import (
-            ConsecutiveVersionsFetcher,
+            ConsecutiveVersionRetriever,
         )
 
-        return ConsecutiveVersionsFetcher
+        return ConsecutiveVersionRetriever
 
     def get_start_date(self):
         return self.start_date
 
     def get_end_date(self):
         return self.end_date
+
+    def get_fields_by_model(self):
+        """
+        override this as a dict of model -> fields
+        entries will be filtered in only
+        if they have different values for these fields
+        """
+        return self.fields_by_model
+
+    def get_diffable_fields_for_model(self, model):
+        """
+        Override this to filter out specific fields from being diffed
+        This is different than get_fields_by_model
+        it won't filter entries, only which fields diffs are shown
+        """
+
+        return get_diffable_fields_for_model(model)
+
+    def get_livename_loader(self, model):
+        if hasattr(model, "changelog_live_name_fetcher_class"):
+            return model.changelog_live_name_fetcher_class.get_instance()
+
+    def get_livename(self, live_record):
+        fetcher = self.get_livename_loader(live_record.__class__)
+        if fetcher:
+            return fetcher.get_lazy(live_record.id)
+
+        if hasattr(live_record, "name"):
+            return live_record.name
+
+        return live_record.__str__()
+
+
+class SingleRecordChangelogConfig(ChangelogConfig):
+    def __init__(self, record=None, **kwargs):
+        assert (
+            record is not None
+        ), "must pass record kwarg to SingleRecordChangelogConfig"
+        self.record = record
+        super().__init__(**kwargs)
+
+    def get_models(self):
+        return [self.record.__class__]
+
+    def get_base_version_queryset_for_single_model(self, live_model):
+        return live_model._history_class.objects.filter(eternal=self.record)
 
 
 class ChangelogEntry:
@@ -85,7 +161,7 @@ class ChangelogEntry:
         self.eternal = eternal
         self.config = config
 
-    def get_diffs(self) -> List:
+    def _get_diffs(self) -> List:
 
         if self.left_version is None and self.right_version is not None:
             return [CreateDiff()]
@@ -94,7 +170,9 @@ class ChangelogEntry:
             return [DeleteDiff()]
 
         specified_fields = self.config.get_fields()
-        diffable_fields = get_diffable_fields_for_model(self.eternal.__class__)
+        diffable_fields = self.config.get_diffable_fields_for_model(
+            self.eternal.__class__
+        )
         fields_to_diff = diffable_fields
         if specified_fields:
             fields_to_diff = [
@@ -109,65 +187,75 @@ class ChangelogEntry:
                 field,
             )
             if diff_obj is not None:
+
+                if hasattr(diff_obj, "queue_dependencies"):
+                    diff_obj.queue_dependencies()
                 diffs.append(diff_obj)
 
         return diffs
 
     @cached_property
     def diffs(self):
-        return self.get_diffs()
+        return self._get_diffs()
 
     def queue_deps(self):
-        # TODO: return promised diffs and live names ??
-        # maybe this is just taken care of by the fetcher
-        pass
+        self._get_author_lazy()
+        self._get_live_name_possibly_lazy()
+        self.diffs
+
+    def _get_live_name_possibly_lazy(self):
+        livename = self.config.get_livename(self.eternal)
+
+        return livename
 
     @cached_property
     def live_name(self):
-        live_obj = self.eternal
+        value = self._get_live_name_possibly_lazy()
 
-        if hasattr(live_obj, "changelog_live_name_fetcher_class"):
-            fetcher = live_obj.changelog_live_name_fetcher_class.get_instance()
-            return fetcher.get(live_obj.id)
+        if isinstance(value, LazyFetchedValue):
+            return value.get_val()
 
-        if hasattr(live_obj, "name"):
-            return live_obj.name
+        return value
 
-        return live_obj.__str__()
+    def _get_author_lazy(self):
+        if self.right_version and getattr(
+            self.right_version, "edited_by_id", None
+        ):
+            fetcher = PrimaryKeyFetcherFactory.get_model_by_id_fetcher(
+                get_user_model()
+            ).get_instance()
+
+            return fetcher.get_lazy(self.right_version.edited_by_id)
+
+    @cached_property
+    def author(self):
+        author_lazy = self._get_author_lazy()
+        if author_lazy:
+            return author_lazy.get_val()
 
 
 class Changelog:
     def __init__(self, config: ChangelogConfig):
         self.config = config
-        self._get_fetcher = lru_cache(maxsize=None)(self._get_fetcher)
 
-    def _get_fetcher(self, page_num):
-        #  FETCHER API REFACTOR TODO
+    @cached_property
+    def _fetcher(self):
         FetcherCls = self.config.get_fetcher_class()
         fetcher = FetcherCls(
-            page_size=self.config.get_page_size(),
-            page_num=page_num,
-            models=self.config.get_models(),
-            user_ids=self.config.get_user_ids(),
-            exclude_create=self.config.get_create_mode() == EXCLUDE_CREATES,
-            only_creates=self.config.get_create_mode() == ONLY_CREATES,
-            fields_by_model=self.config.get_fields(),
-            start_date=self.config.get_start_date(),
-            end_date=self.config.get_end_date(),
-            # TODO: replace all of these kwargs with a single config object
             config=self.config,
         )
         return fetcher
 
-    def get_entries(self, page_num: int) -> List[ChangelogEntry]:
-        fetcher = self._get_fetcher(page_num)
-        fetcher.prefetch_entries_and_diff_dependencies()
-        return fetcher.get_fully_fetched_edit_entries()
+    def get_entries(self, page_num, prefetch_deps=True):
+        entries = self._fetcher.get_entries(page_num, prefetch_deps)
+        if prefetch_deps:
+            for e in entries:
+                e.queue_deps()
 
-    def get_num_pages(self) -> int:
-        fetcher = self._get_fetcher(1)
-        return fetcher.get_total_page_count()
+        return entries
 
-    def get_total_entry_count(self) -> int:
-        fetcher = self._get_fetcher(1)
-        return fetcher.get_total_entry_count()
+    def get_page_count(self):
+        return self._fetcher.get_page_count()
+
+    def get_entry_count(self) -> int:
+        return self._fetcher.get_entry_count()

@@ -1,10 +1,11 @@
 from django.views.generic import TemplateView
 
+from data_fetcher.global_request_context import GlobalRequest, get_request
+
 from versionator.changelog.new_changelog import Changelog
 
 
 class AbstractChangelogView(TemplateView):
-
     def get_graphql_variables(self):
         page_num = self.kwargs.get("page_num", 1)
         return {
@@ -22,7 +23,7 @@ class AbstractChangelogView(TemplateView):
         page_num = self.kwargs.get("page_num", 1)
         entries = changelog.get_entries(page_num)
 
-        num_pages = changelog.get_num_pages()
+        num_pages = changelog.get_page_count()
 
         has_next_page = page_num < num_pages
 
@@ -44,10 +45,17 @@ class AbstractChangelogView(TemplateView):
             "next_page_num": next_page,
             "num_pages": num_pages,
             "page_num": page_num,
+            "entry_count": changelog.get_entry_count(),
         }
 
     def get_context_data(self, *args, **kwargs):
-        changelog_context_data = self.get_changelog_data()
+
+        if not get_request():
+            with GlobalRequest():
+                changelog_context_data = self.get_changelog_data()
+        else:
+            changelog_context_data = self.get_changelog_data()
+
         return {
             **super().get_context_data(*args, **kwargs),
             **changelog_context_data,
