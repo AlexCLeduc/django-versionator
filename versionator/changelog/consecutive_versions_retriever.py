@@ -6,7 +6,7 @@ from django.core.paginator import Paginator
 from django.db.models import CharField, F, OuterRef, Q, Subquery, Value
 from django.utils.functional import cached_property
 
-from versionator.changelog.new_changelog import (
+from versionator.changelog.changelog import (
     EXCLUDE_CREATES,
     ONLY_CREATES,
     ChangelogEntry,

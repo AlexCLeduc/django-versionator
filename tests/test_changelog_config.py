@@ -8,7 +8,7 @@ from pytest_django.asserts import assertInHTML
 from sample_app.data_factories import AuthorFactory, BookFactory
 from sample_app.fetchers import BookNameFetcher
 from sample_app.models import Author, Book, Tag
-from versionator.changelog.new_changelog import (
+from versionator.changelog.changelog import (
     Changelog,
     ChangelogConfig,
     SingleRecordChangelogConfig,

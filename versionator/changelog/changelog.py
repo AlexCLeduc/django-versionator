@@ -89,7 +89,7 @@ class ChangelogConfig:
         return history_model.objects.all()
 
     def get_fetcher_class(self) -> type:
-        from versionator.changelog.consecutive_versions_fetcher import (
+        from versionator.changelog.consecutive_versions_retriever import (
             ConsecutiveVersionRetriever,
         )
 

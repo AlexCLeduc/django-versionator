@@ -3,7 +3,7 @@ from django.shortcuts import render
 
 from data_fetcher.global_request_context import GlobalRequest
 
-from versionator.changelog.new_changelog import Changelog, ChangelogConfig
+from versionator.changelog.changelog import Changelog, ChangelogConfig
 from versionator.changelog.views import AbstractChangelogView
 
 from .models import Book

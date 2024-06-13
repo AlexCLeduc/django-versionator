@@ -2,7 +2,7 @@ from django.views.generic import TemplateView
 
 from data_fetcher.global_request_context import GlobalRequest, get_request
 
-from versionator.changelog.new_changelog import Changelog
+from versionator.changelog.changelog import Changelog
 
 
 class AbstractChangelogView(TemplateView):
