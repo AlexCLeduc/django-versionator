@@ -3,6 +3,7 @@ from functools import lru_cache
 from typing import List
 
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.db.models import Model
 from django.utils.functional import cached_property
 
@@ -12,7 +13,14 @@ from data_fetcher.core import LazyFetchedValue
 from versionator.changelog.util import get_diffable_fields_for_model
 from versionator.core import VersionModel
 
-from .diff import CreateDiff, DeleteDiff, get_field_diff_for_version_pair
+from .diff import (
+    CreateDiff,
+    DeleteDiff,
+    ForeignKeyDiffObject,
+    M2MDiffObject,
+    ScalarDiffObject,
+    get_field_diff_for_version_pair,
+)
 
 EXCLUDE_CREATES = "exlude_creates"
 INCLUDE_CREATES = "include_creates"
@@ -132,6 +140,18 @@ class ChangelogConfig:
 
         return live_record.__str__()
 
+    def get_diff_class(self, field):
+
+        if hasattr(field, "get_changelog_diff_class"):
+            return field.get_changelog_diff_class()
+
+        if isinstance(field, models.ManyToManyField):
+            return M2MDiffObject
+        elif isinstance(field, models.ForeignKey):
+            return ForeignKeyDiffObject
+        else:
+            return ScalarDiffObject
+
 
 class SingleRecordChangelogConfig(ChangelogConfig):
     def __init__(self, record=None, **kwargs):
@@ -184,7 +204,8 @@ class ChangelogEntry:
             diff_obj = get_field_diff_for_version_pair(
                 self.right_version,
                 self.left_version,
-                field,
+                field=field,
+                config=self.config,
             )
             if diff_obj is not None:
 

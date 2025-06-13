@@ -20,8 +20,15 @@ class DiffObject:
 
 
 class CachedComputationDiff(DiffObject):
-    def _compute_diffs(self):
+    def compute_diffs(self):
+        """
+        should return a 3-tuple: (joint, before, after)
+        """
         raise NotImplementedError()
+
+    @cached_property
+    def _diffs(self):
+        return self.compute_diffs()
 
     def get_combined_diff(self):
         return self._diffs[0]
@@ -34,8 +41,7 @@ class CachedComputationDiff(DiffObject):
 
 
 class ScalarDiffObject(CachedComputationDiff):
-    @cached_property
-    def _diffs(self):
+    def compute_diffs(self):
         prev_db_value = self.previous_version.serializable_value(
             self.field.name
         )
@@ -110,8 +116,7 @@ class DeleteDiff:
 
 
 class M2MDiffObject(CachedComputationDiff):
-    @cached_property
-    def _diffs(self):
+    def compute_diffs(self):
         prev_instances = self.previous_instances().get()
         current_instances = self.current_instances().get()
 
@@ -148,8 +153,7 @@ class M2MDiffObject(CachedComputationDiff):
 
 
 class ForeignKeyDiffObject(CachedComputationDiff):
-    @cached_property
-    def _diffs(self):
+    def compute_diffs(self):
         previous_instance = self.get_before_record().get()
         current_instance = self.get_after_record().get()
 
@@ -205,21 +209,16 @@ def is_field_different_accross_versions(
 
 
 def get_field_diff_for_version_pair(
-    current_version, previous_version, field_obj
+    current_version, previous_version, field, config
 ):
     if not is_field_different_accross_versions(
-        current_version, previous_version, field_obj.name
+        current_version, previous_version, field.name
     ):
         return None
 
-    if isinstance(field_obj, ManyToManyField):
-        DiffClass = M2MDiffObject
-    elif isinstance(field_obj, ForeignKey):
-        DiffClass = ForeignKeyDiffObject
-    else:
-        DiffClass = ScalarDiffObject
+    DiffClass = config.get_diff_class(field)
 
-    diff_obj = DiffClass(current_version, previous_version, field_obj)
+    diff_obj = DiffClass(current_version, previous_version, field)
     return diff_obj
 
 

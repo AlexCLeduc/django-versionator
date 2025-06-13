@@ -3,6 +3,7 @@ from django.db import models
 from django.utils import timezone
 
 from versionator import VersionModel
+from versionator.changelog.diff import ScalarDiffObject, list_diff
 
 from .fetchers import BookNameFetcher
 
@@ -50,6 +51,28 @@ class Tag(models.Model):
         return self.name
 
 
+class CsvCharFieldDiff(ScalarDiffObject):
+    """
+    example diff class for a CharField that stores CSV data
+    will have a list-like diff rather than a simple string diff
+    """
+
+    def compute_diffs(self):
+        prev_val = self.previous_version.serializable_value(self.field.name)
+        current_val = self.current_version.serializable_value(self.field.name)
+
+        prev_list = prev_val.split(",") if prev_val else []
+        current_list = current_val.split(",") if current_val else []
+        joint, before, after = list_diff(prev_list, current_list)
+
+        return (joint, before, after)
+
+
+class CharFieldWithCustomDiff(models.CharField):
+    def get_changelog_diff_class(self):
+        return CsvCharFieldDiff
+
+
 class Book(models.Model):
 
     # changelog_live_name_fetcher_class = BookNameLoader
@@ -59,6 +82,10 @@ class Book(models.Model):
     )
     title = models.CharField(max_length=250)
     tags = models.ManyToManyField(Tag)
+    csv_tags = CharFieldWithCustomDiff(
+        max_length=500,
+        blank=True,
+    )
 
     changelog_live_name_fetcher_class = BookNameFetcher
 

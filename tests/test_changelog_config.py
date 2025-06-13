@@ -7,12 +7,13 @@ from pytest_django.asserts import assertInHTML
 
 from sample_app.data_factories import AuthorFactory, BookFactory
 from sample_app.fetchers import BookNameFetcher
-from sample_app.models import Author, Book, Tag
+from sample_app.models import Author, Book, CsvCharFieldDiff, Tag
 from versionator.changelog.changelog import (
     Changelog,
     ChangelogConfig,
     SingleRecordChangelogConfig,
 )
+from versionator.changelog.diff import ScalarDiffObject, text_compare_inline
 
 
 def modify_record(record, **kwargs):
@@ -236,3 +237,80 @@ def test_exclude_creates():
     for entry in entries:
         for diff in entry.diffs:
             assert diff.field is not None
+
+
+def test_with_custom_diff_on_config():
+
+    class CapitalizedDiff(ScalarDiffObject):
+        def compute_diffs(self):
+            prev_val = self.previous_version.serializable_value(
+                self.field.name
+            )
+            current_val = self.current_version.serializable_value(
+                self.field.name
+            )
+
+            if prev_val is None:
+                prev_val = ""
+            if current_val is None:
+                current_val = ""
+
+            prev_val = prev_val.upper()
+            current_val = current_val.upper()
+
+            joint, before, after = text_compare_inline(prev_val, current_val)
+            return (joint, before, after)
+
+    class ConfigWithCustomDiff(ChangelogConfig):
+        def get_diff_class(self, field):
+            if field.name == "title":
+                return CapitalizedDiff
+            return super().get_diff_class(field)
+
+    b = BookFactory(title="test book")
+    modify_record(b, title="test book 2")
+    config = ConfigWithCustomDiff(
+        models=[Book],
+    )
+    changelog = Changelog(config)
+    entries = changelog.get_entries(1)
+    assert len(entries) == 2
+    assert len(entries[0].diffs) == 1
+    diff = entries[0].diffs[0]
+    assert isinstance(diff, CapitalizedDiff)
+    assert "TEST   BOOK" in diff.get_after_diff()
+    assert "TEST   BOOK" in diff.get_before_diff()
+    assert "TEST   BOOK" in diff.get_combined_diff()
+
+
+def test_with_custom_diff_on_model_field():
+    b = BookFactory()
+    b.reset_version_attrs()
+    b.csv_tags = "tag1,tag2,tag3"
+    b.save()
+    b.reset_version_attrs()
+    b.csv_tags = "tag1,tag2,tag4"
+    b.save()
+
+    config = ChangelogConfig(
+        models=[Book],
+    )
+    changelog = Changelog(config)
+    entries = changelog.get_entries(1)
+    assert len(entries) == 3
+    assert len(entries[0].diffs) == 1
+    diff = entries[0].diffs[0]
+    assert isinstance(diff, CsvCharFieldDiff)
+
+    assert "<p class=''>tag2</p>" in diff.get_before_diff()
+    assert "<p class=''>tag1</p>" in diff.get_before_diff()
+    assert "<p class='diff_sub'>tag3</p>" in diff.get_before_diff()
+
+    assert "<p class=''>tag2</p>" in diff.get_after_diff()
+    assert "<p class=''>tag1</p>" in diff.get_after_diff()
+    assert "<p class='diff_add'>tag4</p>" in diff.get_after_diff()
+
+    assert "<p class=''>tag2</p>" in diff.get_combined_diff()
+    assert "<p class=''>tag1</p>" in diff.get_combined_diff()
+    assert "<p class='diff_add'>tag4</p>" in diff.get_combined_diff()
+    assert "<p class='diff_sub'>tag3</p>" in diff.get_combined_diff()
