@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "debug_toolbar",
     "django_extensions",
     "sample_app",
 ]
@@ -54,6 +55,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "versionator.middleware.WhodidMiddleware",
 ]
 
@@ -137,3 +139,11 @@ IS_TEST = False
 if "test" in sys.argv or any("pytest" in arg for arg in sys.argv):
     IS_TEST = True
     TEST_RUNNER = "pytest_test_runner.PytestTestRunner"
+
+
+# for debug_toolbar
+INTERNAL_IPS = [
+    # ...
+    "127.0.0.1",
+    # ...
+]

@@ -22,6 +22,7 @@ class BookFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Book
 
+    title = factory.Faker("bs")
     author = factory.SubFactory(AuthorFactory)
 
     @factory.post_generation

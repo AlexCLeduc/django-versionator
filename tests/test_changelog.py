@@ -1,48 +1,23 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+
+from django.contrib.auth import get_user_model
 
 import pytest
+from data_fetcher.global_request_context import GlobalRequest
 from pytest_django.asserts import assertInHTML
 
+from sample_app.data_factories import BookFactory
+from sample_app.fetchers import BookNameFetcher
 from sample_app.models import Author, Book, Tag
-from tests.changelog_unit_tests.example_schema import QueryExecutor
+from versionator.changelog import Changelog, ChangelogConfig
 
-base_query = QueryExecutor().build_query(
-    """
-    query ChangelogQuery($page_num :Int!) {
-        changelog(
-            page_num:$page_num,
-        ){
-            has_next_page
-            changelog_entries {
-                model_name
-                version {
-                    instance
-                    edited_by
-                }
-                eternal
-        
-                live_name
-                edit_date
-                diffs {
-                    field
-                    field_name
-                    action
-                    diffed_before
-                    diffed_after
-                    diffed_combined
-                }
-            }
-        }
-    }
-"""
+changelog_config = ChangelogConfig(
+    models=[Author, Book],
+    page_size=2,
 )
 
 
-def test_changelog():
-    data = base_query(page_num=1)
-
-
-def test_entire_graphql_changelog():
+def test_simple_case():
     author1 = Author.objects.create(first_name="john", last_name="smith")
     author2 = Author.objects.create(first_name="jane", last_name="smith")
     book1 = Book.objects.create(author=author1, title="john's diary")
@@ -57,20 +32,14 @@ def test_entire_graphql_changelog():
 
     book1_v2 = book1.versions.last()
 
-    with patch(
-        "versionator.changelog.changelog_graphql.util.get_changelog_page_size",
-        lambda _: 2,
-    ):
-        data = base_query(page_num=1)
-
-    edit_entries = data["changelog"]["changelog_entries"]
+    cl = Changelog(changelog_config)
+    edit_entries = cl.get_entries(1)
     assert len(edit_entries) == 2
 
-    assert edit_entries[0]["version"]["instance"] == book1_v2
-    assert len(edit_entries[0]["diffs"]) == 2
-    diffs_by_fields = {
-        diff["field_name"]: diff for diff in edit_entries[0]["diffs"]
-    }
+    assert edit_entries[0].right_version == book1_v2
+    diffs = edit_entries[0].diffs
+    assert len(diffs) == 2
+    diffs_by_fields = {diff.field.name: diff for diff in diffs}
 
     # field-diffs might come in any order
     assert set(diffs_by_fields.keys()) == {
@@ -78,22 +47,30 @@ def test_entire_graphql_changelog():
         "author",
     }
     # they have field objects as well
-    assert diffs_by_fields["title"]["field"] == Book._meta.get_field("title")
+    assert diffs_by_fields["title"].field == Book._meta.get_field("title")
 
-    assert edit_entries[1]["version"]["instance"] == book1_v1
+    assert edit_entries[1].right_version == book1_v1
 
-    assert edit_entries[1]["diffs"][0]["action"] == "created"
+    second_entry_diffs = edit_entries[1].diffs
+    assert second_entry_diffs[0].action == "created"
 
-    assert edit_entries[0]["eternal"] == edit_entries[1]["eternal"] == book1
-    assert edit_entries[0]["model_name"] == "book"
+    assert edit_entries[0].eternal == edit_entries[1].eternal == book1
 
     # test that the book's loader is used to load the live name
-    assert edit_entries[0]["live_name"] == "jane's diary (jane smith)"
+    assert edit_entries[0].live_name == "jane's diary (jane smith)"
 
-    assert data["changelog"]["has_next_page"] == True
+    assert cl.get_page_count() == 2
+    assert cl.get_entry_count() == 4
 
 
 def test_m2m_entries():
+
+    changelog_config = ChangelogConfig(
+        models=[Book],
+        page_size=100,
+    )
+    changelog = Changelog(changelog_config)
+
     t1 = Tag.objects.create(name="Tag1")
     t2 = Tag.objects.create(name="Tag2")
     t3 = Tag.objects.create(name="Tag3")
@@ -112,23 +89,90 @@ def test_m2m_entries():
     book.save()
 
     book_v2 = book.versions.last()
-    data = base_query(page_num=1)
-    edit_entries = data["changelog"]["changelog_entries"]
-    assert len(edit_entries) == 3
 
-    assert edit_entries[0]["version"]["instance"] == book_v2
-    assert len(edit_entries[0]["diffs"]) == 1
+    edit_entries = changelog.get_entries(1)
+    assert len(edit_entries) == 2
 
-    m2m_diff = edit_entries[0]["diffs"][0]
-    assert m2m_diff["action"] == "edited"
-    assert m2m_diff["field_name"] == "tags"
+    latest_entry = edit_entries[0]
+    latest_entry_diffs = latest_entry.diffs
+
+    assert latest_entry.right_version == book_v2
+    assert len(latest_entry_diffs) == 1
+
+    m2m_diff = latest_entry_diffs[0]
+    assert m2m_diff.action == "edited"
+    assert m2m_diff.field.name == "tags"
     # non-added/removed tag show up without class in both before/after
-    assertInHTML("<p class=''>Tag2</p>", m2m_diff["diffed_before"])
-    assertInHTML("<p class=''>Tag2</p>", m2m_diff["diffed_after"])
 
-    assertInHTML("<p class='diff_sub'>Tag1</p>", m2m_diff["diffed_before"])
-    assertInHTML("<p class='diff_add'>Tag3</p>", m2m_diff["diffed_after"])
+    assertInHTML("<p class=''>Tag2</p>", m2m_diff.get_before_diff())
+    assertInHTML("<p class=''>Tag2</p>", m2m_diff.get_after_diff())
 
-    assertInHTML("<p class=''>Tag2</p>", m2m_diff["diffed_combined"])
-    assertInHTML("<p class='diff_sub'>Tag1</p>", m2m_diff["diffed_combined"])
-    assertInHTML("<p class='diff_add'>Tag3</p>", m2m_diff["diffed_combined"])
+    assertInHTML("<p class='diff_sub'>Tag1</p>", m2m_diff.get_before_diff())
+    assertInHTML("<p class='diff_add'>Tag3</p>", m2m_diff.get_after_diff())
+
+    assertInHTML("<p class=''>Tag2</p>", m2m_diff.get_combined_diff())
+    assertInHTML("<p class='diff_sub'>Tag1</p>", m2m_diff.get_combined_diff())
+    assertInHTML("<p class='diff_add'>Tag3</p>", m2m_diff.get_combined_diff())
+
+
+def test_num_queries_batched(django_assert_max_num_queries):
+    books = BookFactory.create_batch(50)
+
+    for b in books:
+        b.reset_version_attrs()
+        b.title = "new title"
+        b.save()
+
+    changelog_config = ChangelogConfig(
+        models=[Book],
+        page_size=100,
+    )
+
+    with django_assert_max_num_queries(0):
+        # instantiating the changelog object should not make any queries
+        cl = Changelog(changelog_config)
+
+    batch_load_spy = Mock()
+
+    real_batch_load = BookNameFetcher.batch_load
+
+    def mocked_batch_load(*args, **kwargs):
+        batch_load_spy(*args, **kwargs)
+        return real_batch_load(*args, **kwargs)
+
+    with (
+        GlobalRequest(),
+        patch(
+            "sample_app.fetchers.BookNameFetcher.batch_load",
+            staticmethod(mocked_batch_load),
+        ),
+        django_assert_max_num_queries(10),
+    ):
+        entries = cl.get_entries(1)
+        for entry in entries:
+            entry.live_name
+
+    assert batch_load_spy.call_count == 1
+
+
+def test_authors_are_batched(django_assert_max_num_queries):
+
+    books = BookFactory.create_batch(100)
+    for i, b in enumerate(books):
+        b.reset_version_attrs()
+        b.title = "new title"
+        b.save()
+        last_ver = b.versions.last()
+        last_ver.edited_by = get_user_model().objects.create_user(f"test_{i}")
+        last_ver.save()
+
+    changelog_config = ChangelogConfig(
+        models=[Book],
+        page_size=100,
+    )
+    changelog = Changelog(changelog_config)
+
+    with GlobalRequest(), django_assert_max_num_queries(10):
+        entries = changelog.get_entries(1)
+        for entry in entries:
+            assert entry.author is not None

@@ -1,52 +1,33 @@
-from django.urls import reverse
 from django.views.generic import TemplateView
+
+from data_fetcher.global_request_context import GlobalRequest, get_request
+
+from versionator.changelog.changelog import Changelog
 
 
 class AbstractChangelogView(TemplateView):
-    """
-    query must contain
-        changelog(page_num,...)
-            num_pages
-            has_next_page
-            changelog_entries {
-
-            }
-        }
-
-    """
-
-    template_name = None
-    graphql_query = None
-    query_executor_class = None
-
-    @classmethod
-    def as_view(cls, *args, **kwargs):
-        assert cls.template_name, "must define template_name"
-        assert cls.graphql_query, "must define graphql_query"
-        assert cls.query_executor_class, "must define query_executor_class"
-        return super().as_view(*args, **kwargs)
-
     def get_graphql_variables(self):
         page_num = self.kwargs.get("page_num", 1)
         return {
             "page_num": page_num,
         }
 
+    def get_changelog_config(self):
+        if not hasattr(self, "changelog_config"):
+            raise NotImplementedError(
+                "You must define a `changelog_config` attribute on your view or override `get_changelog_config` method"
+            )
+
     def get_changelog_data(self):
+        changelog = Changelog(self.get_changelog_config())
         page_num = self.kwargs.get("page_num", 1)
-        variables = self.get_graphql_variables()
-        query_executor = self.query_executor_class()
-        data = query_executor.execute_query(
-            self.graphql_query, variables=variables
-        )
+        entries = changelog.get_entries(page_num)
 
-        edit_entries = data["changelog"]["changelog_entries"]
-        has_next_page = data["changelog"]["has_next_page"]
-        num_pages = data["changelog"]["num_pages"]
+        num_pages = changelog.get_page_count()
 
-        entries_without_diffs = [
-            entry for entry in edit_entries if not entry["diffs"]
-        ]
+        has_next_page = page_num < num_pages
+
+        entries_without_diffs = [entry for entry in entries if not entry.diffs]
 
         prev_page = None
         next_page = None
@@ -59,15 +40,22 @@ class AbstractChangelogView(TemplateView):
 
         return {
             "entries_without_diffs": entries_without_diffs,
-            "edit_entries": edit_entries,
+            "entries": entries,
             "prev_page_num": prev_page,
             "next_page_num": next_page,
             "num_pages": num_pages,
             "page_num": page_num,
+            "entry_count": changelog.get_entry_count(),
         }
 
     def get_context_data(self, *args, **kwargs):
-        changelog_context_data = self.get_changelog_data()
+
+        if not get_request():
+            with GlobalRequest():
+                changelog_context_data = self.get_changelog_data()
+        else:
+            changelog_context_data = self.get_changelog_data()
+
         return {
             **super().get_context_data(*args, **kwargs),
             **changelog_context_data,

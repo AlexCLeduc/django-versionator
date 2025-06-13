@@ -2,8 +2,9 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from .dataloaders import BookNameLoader
 from versionator import VersionModel
+
+from .fetchers import BookNameFetcher
 
 
 class CustomVersionModel(VersionModel):
@@ -34,7 +35,9 @@ class Author(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
 
-        
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+
 
 class AuthorVersion(CustomVersionModel):
     live_model = Author
@@ -47,16 +50,17 @@ class Tag(models.Model):
         return self.name
 
 
-
 class Book(models.Model):
 
-    # changelog_live_name_loader_class = BookNameLoader
+    # changelog_live_name_fetcher_class = BookNameLoader
 
-    author = models.ForeignKey(Author, related_name="books", on_delete=models.CASCADE)
+    author = models.ForeignKey(
+        Author, related_name="books", on_delete=models.CASCADE, null=True
+    )
     title = models.CharField(max_length=250)
     tags = models.ManyToManyField(Tag)
 
-    changelog_live_name_loader_class = BookNameLoader
+    changelog_live_name_fetcher_class = BookNameFetcher
 
 
 class BookVersion(CustomVersionModelWithEditor):

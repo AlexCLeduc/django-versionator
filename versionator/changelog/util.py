@@ -6,7 +6,11 @@ def get_excluded_fields_for_model(live_model):
 
 
 def get_diffable_fields_for_model(live_model):
-    all_fields = [*live_model._meta.fields, *live_model._meta.many_to_many]
+    history_model = live_model._history_class
+    all_fields = [
+        *history_model.get_fields_to_version(),
+        *history_model.get_m2m_fields_to_version(),
+    ]
 
     excluded = get_excluded_fields_for_model(live_model)
 
