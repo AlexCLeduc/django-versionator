@@ -1,3 +1,5 @@
+import random
+
 import factory
 
 from .models import Author, Book, Tag
@@ -24,6 +26,13 @@ class BookFactory(factory.django.DjangoModelFactory):
 
     title = factory.Faker("bs")
     author = factory.SubFactory(AuthorFactory)
+    csv_tags = factory.LazyFunction(
+        lambda: ",".join(
+            factory.Faker("words", nb=random.choice([0, 1, 2, 3, 4])).generate(
+                {}
+            )
+        )
+    )
 
     @factory.post_generation
     def tags(self, create, extracted, **kwargs):
